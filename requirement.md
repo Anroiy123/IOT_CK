@@ -1,0 +1,24 @@
+Các em Sinh viên thân mến,
+
+Thầy gửi đề tài môn học. Nhóm đọc kỹ yêu cầu, phân công nhiệm vụ rõ ràng từng thành viên và phản hồi xác nhận đã nhận đề tài.
+
+1.               Thiết bị nhận dạng cử chỉ tay (Gesture Recognition) cho điều khiển thông minh xe tự hành
+
+Thiết kế thiết bị điều khiển bằng cử chỉ tay sử dụng Deep Learning. (model được lưu trữ trên cloud: AWS/ Google Cloud/ Azure/ etc)
+
+Tìm hiểu dataset liên quan (đã công bố)
+So sánh CNN vs CNN-LSTM
+Đề xuất mô hình nhẹ cho real-time
+Phân tích độ trễ điều khiển
+Đánh giá
+
+Accuracy (%)
+Latency điều khiển (ms)
+Robustness trước background phức tạp
+Hướng: Human–Computer Interaction AI.
+
+Nếu có thắc mắc, các em cứ mạnh dạn hỏi trực tiếp, qua email, hoặc trong giờ học.
+
+Trân trọng.
+
+GVMH.
