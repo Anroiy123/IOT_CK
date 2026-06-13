@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
     paths:
       - ".github/workflows/build-azure-image.yml"
       - "cloud/**"
       - "common/**"
       - "deploy/azure/**"
       - "deploy/huggingface/requirements.txt"
+      - "models/gesture-cnn-baseline-s05-partial.keras"
 
 permissions:
   contents: read
