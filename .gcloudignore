@@ -1,0 +1,18 @@
+.gcloudignore
+.git/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+.kiro/
+.claude/
+arduino/
+firmware/
+data/
+reports/
+tests/
+lab Robot/
+*.png
+*.mp4
+models/*
+!models/gesture-cnn-baseline-s05-partial.keras
