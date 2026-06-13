@@ -8,6 +8,58 @@ APP_NAME="${APP_NAME:-iot-ck-gesture-api}"
 IMAGE="${IMAGE:-ghcr.io/anroiy123/iot-ck-gesture-api:azure}"
 API_KEY="${GESTURE_API_KEY:?Set GESTURE_API_KEY before running this script}"
 
+create_environment_with_fallback() {
+  local locations=(
+    "$LOCATION"
+    westus2
+    westus3
+    westus
+    westcentralus
+    centralus
+    northcentralus
+    southcentralus
+    eastus2
+    eastus
+    canadacentral
+    canadaeast
+    westeurope
+    northeurope
+    uksouth
+    ukwest
+    swedencentral
+    francecentral
+    germanywestcentral
+    japaneast
+    australiaeast
+    koreacentral
+  )
+  local tried=()
+  local location
+  for location in "${locations[@]}"; do
+    if [[ " ${tried[*]} " == *" $location "* ]]; then
+      continue
+    fi
+    tried+=("$location")
+    echo "Trying Container Apps environment location: $location"
+    if az containerapp env create \
+      --name "$ENVIRONMENT" \
+      --resource-group "$RESOURCE_GROUP" \
+      --location "$location" \
+      --logs-destination none \
+      --output table; then
+      LOCATION="$location"
+      export LOCATION
+      echo "Selected Container Apps location: $LOCATION"
+      return 0
+    fi
+    echo "Location $location failed; trying next candidate..." >&2
+  done
+  echo "Could not create Container Apps environment in any candidate location." >&2
+  echo "Run this command to inspect allowed policy locations:" >&2
+  echo "az policy assignment list --scope /subscriptions/\$(az account show --query id -o tsv) -o jsonc" >&2
+  return 1
+}
+
 az account show --output table
 if az group show --name "$RESOURCE_GROUP" >/dev/null 2>&1; then
   az group show --name "$RESOURCE_GROUP" --query "{name:name, location:location}" --output table
@@ -18,12 +70,11 @@ fi
 az provider register --namespace Microsoft.App --wait
 
 if ! az containerapp env show --name "$ENVIRONMENT" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
-  az containerapp env create \
-    --name "$ENVIRONMENT" \
-    --resource-group "$RESOURCE_GROUP" \
-    --location "$LOCATION" \
-    --logs-destination none \
-    --output table
+  create_environment_with_fallback
+else
+  LOCATION="$(az containerapp env show --name "$ENVIRONMENT" --resource-group "$RESOURCE_GROUP" --query location -o tsv)"
+  export LOCATION
+  echo "Using existing Container Apps environment in: $LOCATION"
 fi
 
 if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then

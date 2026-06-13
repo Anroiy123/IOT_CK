@@ -546,7 +546,8 @@ bash scripts/deploy_azure_container_app.sh
 Script mặc định:
 
 - Resource group: `rg-iot-ck-gesture`
-- Region: `southeastasia`
+- Region ban đầu: `southeastasia`; nếu Azure for Students policy chặn region
+  này, script tự thử các region fallback cho Container Apps.
 - Container Apps environment: `iot-ck-env`
 - App name: `iot-ck-gesture-api`
 - Image: `ghcr.io/anroiy123/iot-ck-gesture-api:azure`
