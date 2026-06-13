@@ -1,0 +1,44 @@
+name: Build Azure Container Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-azure-image.yml"
+      - "cloud/**"
+      - "common/**"
+      - "deploy/azure/**"
+      - "deploy/huggingface/requirements.txt"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/anroiy123/iot-ck-gesture-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/azure/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:azure
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
