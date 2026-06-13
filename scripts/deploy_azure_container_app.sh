@@ -12,13 +12,13 @@ az account show --output table
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output table
 
 az provider register --namespace Microsoft.App --wait
-az provider register --namespace Microsoft.OperationalInsights --wait
 
 if ! az containerapp env show --name "$ENVIRONMENT" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
   az containerapp env create \
     --name "$ENVIRONMENT" \
     --resource-group "$RESOURCE_GROUP" \
     --location "$LOCATION" \
+    --logs-destination none \
     --output table
 fi
 

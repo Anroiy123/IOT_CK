@@ -553,6 +553,8 @@ Script mặc định:
 - CPU/RAM: `1.0 CPU`, `2.0Gi`
 - Scale: `min-replicas=0`, `max-replicas=1`
 - Ingress: external HTTP, target port `7860`
+- Logs destination: `none` để không tạo Log Analytics workspace. Gateway vẫn
+  ghi log latency CSV ở laptop.
 
 Sau khi script in URL Azure, kiểm tra:
 
