@@ -231,12 +231,22 @@ Git ignore.
 Tạo file `.env` ở root:
 
 ```dotenv
-GESTURE_API_KEY=API_KEY_CUA_SPACE
+GESTURE_API_KEY=API_KEY_CUA_CLOUD_API
 ESP32_COMMAND_TOKEN=TOKEN_DIEU_KHIEN
 ```
 
 `.env` đã được Git ignore. API key cloud và command token ESP32 có thể khác
 nhau; không dùng Hugging Face access token làm API key của ứng dụng.
+
+Phân biệt hai token quan trọng:
+
+- `GESTURE_API_KEY`: khóa bí mật của API nhận dạng cử chỉ trên cloud. Gateway
+  gửi khóa này trong header `X-API-Key` khi gọi `/v1/predict`.
+- `ESP32_COMMAND_TOKEN`: khóa điều khiển ESP32. Gateway gửi khóa này trong gói
+  WebSocket để ESP32 từ chối lệnh lạ.
+
+Hai khóa này do nhóm tự đặt, không phải lấy từ Azure Portal, Hugging Face hay
+Google Cloud. Không commit giá trị thật vào GitHub.
 
 ## Nạp firmware ESP32
 
@@ -544,6 +554,21 @@ export GESTURE_API_KEY="<AZURE_API_KEY>"
 bash scripts/deploy_azure_container_app.sh
 ```
 
+`<AZURE_API_KEY>` là chuỗi bí mật do nhóm tự chọn tại thời điểm deploy. Script
+sẽ đưa giá trị này vào biến môi trường `GESTURE_API_KEY` của Azure Container
+App. Gateway phải dùng lại đúng chuỗi đó ở tham số `-ApiKey` hoặc biến
+`AZURE_GESTURE_API_KEY`.
+
+Ví dụ demo có thể đặt:
+
+```bash
+export GESTURE_API_KEY="azure_iot_ck_2026_demo"
+```
+
+Không gõ nguyên chuỗi placeholder `"<AZURE_API_KEY>"` hoặc `"<API_KEY>"` khi
+chạy thật. Nếu dùng placeholder, Azure sẽ trả `401` và gateway sẽ hiển thị
+`no_gesture (0.00)` vì request cloud bị từ chối.
+
 Script mặc định:
 
 - Resource group: `rg-iot-ck-gesture`
@@ -568,16 +593,20 @@ Invoke-RestMethod https://<AZURE_APP_URL>/v1/model
 Chạy gateway với Azure:
 
 ```powershell
-$env:AZURE_GESTURE_API_KEY="<AZURE_API_KEY>"
-.\scripts\run_gateway_azure.ps1 -AzureUrl https://<AZURE_APP_URL> -DryRun
+$env:AZURE_GESTURE_API_KEY="AZURE_API_KEY_DA_DAT_LUC_DEPLOY"
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl https://<AZURE_APP_URL> `
+  -DryRun
 ```
 
 Chạy thật với ESP32:
 
 ```powershell
-$env:AZURE_GESTURE_API_KEY="<AZURE_API_KEY>"
-$env:ESP32_COMMAND_TOKEN="<ESP32_TOKEN>"
-.\scripts\run_gateway_azure.ps1 -AzureUrl https://<AZURE_APP_URL> -Esp32Host <ESP32_IP>
+$env:AZURE_GESTURE_API_KEY="AZURE_API_KEY_DA_DAT_LUC_DEPLOY"
+$env:ESP32_COMMAND_TOKEN="TOKEN_DIEU_KHIEN_DA_NAP_VAO_ESP32"
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl https://<AZURE_APP_URL> `
+  -Esp32Host <ESP32_IP>
 ```
 
 Khi test xong, nếu không cần giữ Azure chạy, xóa resource group để tránh chi phí:
