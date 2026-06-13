@@ -468,5 +468,5 @@ Neu bi lo Wi-Fi password hoac token demo, doi token trong firmware va gateway sc
 
 ## Tai lieu doi chieu
 
-- So do tong the hien tai: [shapes at 26-06-10 21.57.01.png](./shapes%20at%2026-06-10%2021.57.01.png)
+- So do tong the hien tai duoc luu local duoi dang anh demo va khong dua len Git.
 - Requirement de tai: [requirement.txt](./requirement.txt)

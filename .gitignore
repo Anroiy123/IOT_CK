@@ -1,19 +1,54 @@
+# Local environment and secrets
+.env
 .venv/
+arduino/*/config.h
+firmware/include/config.h
+
+# Python cache and test output
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Local runtime/build output
 /.tmp_cloud_pid
 /.hf_space_build/
-*.pyc
-.env
+.pio/
+.platformio/
+firmware/.pio/
+
+# Dataset and model artifacts
 data/raw/
 data/processed/
 models/*.keras
 models/*.h5
 models/*.tflite
 models/*.task
+
+# Generated reports and logs. Keep reports/README.md tracked.
 reports/*.csv
-.pio/
-.platformio/
-firmware/.pio/
-firmware/include/config.h
-arduino/*/config.h
+reports/*.json
+reports/*.log
+reports/*.png
+
+# Local demo media and archives
+/lab Robot/
+/shapes at 26-06-10 21.57.01.png
+*.rar
+*.zip
+*.7z
+*.tar
+*.gz
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Editor/agent local state
+.claude/
+.kiro/
+.vscode/
+.idea/
