@@ -9,7 +9,11 @@ IMAGE="${IMAGE:-ghcr.io/anroiy123/iot-ck-gesture-api:azure}"
 API_KEY="${GESTURE_API_KEY:?Set GESTURE_API_KEY before running this script}"
 
 az account show --output table
-az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output table
+if az group show --name "$RESOURCE_GROUP" >/dev/null 2>&1; then
+  az group show --name "$RESOURCE_GROUP" --query "{name:name, location:location}" --output table
+else
+  az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --output table
+fi
 
 az provider register --namespace Microsoft.App --wait
 
