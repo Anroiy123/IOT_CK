@@ -24,6 +24,7 @@ firmware/.pio/
 data/raw/
 data/processed/
 models/*.keras
+!models/gesture-cnn-baseline-s05-partial.keras
 models/*.h5
 models/*.tflite
 models/*.task

@@ -129,9 +129,10 @@ def run_gateway(args: argparse.Namespace) -> None:
                     total_ms=total_ms,
                 ).to_csv_row()
             )
-            _draw_ui(frame, mode.value, cloud_pred.gesture, cloud_pred.confidence, total_ms, command_name)
+            display_frame = cv2.flip(frame, 1)
+            _draw_ui(display_frame, mode.value, cloud_pred.gesture, cloud_pred.confidence, total_ms, command_name)
             if not args.headless:
-                cv2.imshow("IOT_CK Gateway", frame)
+                cv2.imshow("IOT_CK Gateway", display_frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
             frame_count += 1

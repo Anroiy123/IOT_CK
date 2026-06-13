@@ -524,8 +524,9 @@ GitHub Actions
   -> Azure Container Apps kéo image public từ GHCR
 ```
 
-Dockerfile Azure tự tải model từ Hugging Face Space khi build image, vì file
-`.keras` không được commit vào Git.
+Model `models/gesture-cnn-baseline-s05-partial.keras` được commit trực tiếp
+trong GitHub repository vì file hiện chỉ khoảng 4,38 MB. Dockerfile Azure copy
+model từ build context, nên pipeline Azure không phụ thuộc Hugging Face.
 
 Các bước:
 
