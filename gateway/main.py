@@ -53,7 +53,7 @@ def run_gateway(args: argparse.Namespace) -> None:
             if not ok_jpeg:
                 continue
 
-            if not crop.found_hand:
+            if not crop.found_hand and args.skip_cloud_without_hand:
                 cloud_pred = CloudPrediction(
                     gesture="no_gesture",
                     confidence=0.0,
@@ -188,6 +188,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--session-id")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument(
+        "--skip-cloud-without-hand",
+        action="store_true",
+        help="Debug mode: do not call cloud when MediaPipe does not detect a hand.",
+    )
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument("--log", type=Path, default=Path("reports/gateway_latency.csv"))
     return parser.parse_args()

@@ -7,7 +7,8 @@ param(
   [string]$Log = "reports/gateway_latency.csv",
   [int]$MaxFrames = 0,
   [switch]$Headless,
-  [switch]$DryRun
+  [switch]$DryRun,
+  [switch]$SkipCloudWithoutHand
 )
 
 $wsUrl = "ws://" + $Esp32Host + ":81/"
@@ -23,4 +24,5 @@ $gatewayArgs = @(
 if ($MaxFrames -gt 0) { $gatewayArgs += @("--max-frames", $MaxFrames) }
 if ($Headless) { $gatewayArgs += "--headless" }
 if ($DryRun) { $gatewayArgs += "--dry-run" }
+if ($SkipCloudWithoutHand) { $gatewayArgs += "--skip-cloud-without-hand" }
 ./.venv/Scripts/python.exe @gatewayArgs

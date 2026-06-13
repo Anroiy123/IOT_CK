@@ -7,7 +7,8 @@ param(
   [string]$Log = "reports/gateway_azure_latency.csv",
   [int]$MaxFrames = 0,
   [switch]$Headless,
-  [switch]$DryRun
+  [switch]$DryRun,
+  [switch]$SkipCloudWithoutHand
 )
 
 $envPath = Join-Path (Split-Path $PSScriptRoot -Parent) ".env"
@@ -36,5 +37,6 @@ $arguments = @{
 }
 if ($Headless) { $arguments.Headless = $true }
 if ($DryRun) { $arguments.DryRun = $true }
+if ($SkipCloudWithoutHand) { $arguments.SkipCloudWithoutHand = $true }
 
 & (Join-Path $PSScriptRoot "run_gateway.ps1") @arguments
