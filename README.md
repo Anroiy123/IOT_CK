@@ -682,6 +682,9 @@ Cloud đã chạy model và model thật sự chọn lớp `no_gesture`. Cần:
 - Chạy demo với `-Speed 255`.
 - Nếu xe chỉ giật từng nhịp, tăng thời gian giữ lệnh, ví dụ
   `-DriveHoldMs 800`, nhưng vẫn phải giữ khả năng dừng an toàn.
+- Nếu vừa test WebSocket thủ công với `seq` lớn, hãy dùng bản gateway mới nhất.
+  Gateway sẽ đọc `/state` để tiếp tục từ `last_seq`; nếu chạy bản cũ, ESP32 có
+  thể từ chối lệnh là `stale_seq`.
 - Nếu `esp32_ack_ms` trong CSV khác 0 nhưng bánh vẫn không quay, kiểm tra nguồn
   motor, GND chung, dây `ENA/ENB` và dây `IN1..IN4`.
 

@@ -27,15 +27,19 @@ class DryRunTransport:
 
 
 class WebSocketTransport:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, websocket_client=None) -> None:
         import websocket
 
-        self._ws = websocket.create_connection(url, timeout=1.5)
+        self._ws = websocket_client or websocket.create_connection(url, timeout=1.5)
 
     def send(self, command: Command) -> float:
         import time
 
         start = time.perf_counter()
         self._ws.send(json.dumps(command.to_payload()))
-        self._ws.recv()
+        raw_ack = self._ws.recv()
+        ack = json.loads(raw_ack)
+        if not ack.get("ok", False):
+            error = ack.get("error", "unknown_error")
+            raise RuntimeError(f"ESP32 rejected command seq={command.seq}: {error}")
         return (time.perf_counter() - start) * 1000

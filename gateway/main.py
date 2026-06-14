@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 import cv2
 
@@ -24,7 +27,7 @@ def run_gateway(args: argparse.Namespace) -> None:
     transport = DryRunTransport() if args.dry_run else WebSocketTransport(args.esp32_ws)
     mode = Mode.CAR
     joint = "base"
-    seq = 0
+    seq = _initial_sequence(args.esp32_ws)
     frame_count = 0
     active_drive_template: Command | None = None
     active_drive_until = 0.0
@@ -187,6 +190,19 @@ def run_gateway(args: argparse.Namespace) -> None:
 
 def _is_drive_action(action: Action) -> bool:
     return action in {Action.FORWARD, Action.BACKWARD, Action.LEFT, Action.RIGHT}
+
+
+def _initial_sequence(esp32_ws: str) -> int:
+    try:
+        parsed = urlparse(esp32_ws)
+        host = parsed.hostname
+        if not host:
+            raise ValueError("missing ESP32 host")
+        with urlopen(f"http://{host}/state", timeout=1.5) as response:
+            state = json.loads(response.read().decode("utf-8"))
+        return max(0, int(state.get("last_seq", 0)))
+    except Exception:
+        return int(time.time()) & 0x7FFFFFFF
 
 
 def _send_stop_safely(transport, mapper: GestureMapper, seq: int, session_id: str, request_id: str, mode: Mode, token: str) -> int:
