@@ -8,7 +8,7 @@ from pathlib import Path
 
 import cv2
 
-from common.protocol import Command, GestureMapper, Mode
+from common.protocol import Action, Command, GestureMapper, Mode
 from gateway.cloud_client import CloudGestureClient, CloudPrediction
 from gateway.preprocess import MediaPipeCropper
 from gateway.safety import GestureStabilizer, LatencyLogRow, SafetyPolicy
@@ -26,6 +26,9 @@ def run_gateway(args: argparse.Namespace) -> None:
     joint = "base"
     seq = 0
     frame_count = 0
+    active_drive_template: Command | None = None
+    active_drive_until = 0.0
+    last_drive_repeat_at = 0.0
     args.log.parent.mkdir(parents=True, exist_ok=True)
 
     cap = cv2.VideoCapture(args.camera)
@@ -69,6 +72,7 @@ def run_gateway(args: argparse.Namespace) -> None:
                     cloud_pred = cloud.predict([encoded.tobytes()], session_id=session_id, request_id=request_id)
                 except Exception as exc:
                     print(f"Cloud prediction failed: {exc}")
+                    active_drive_template = None
                     seq = _send_stop_safely(transport, mapper, seq, session_id, request_id, mode, args.esp32_token)
                     cloud_pred = CloudPrediction(
                         gesture="cloud_error",
@@ -106,10 +110,47 @@ def run_gateway(args: argparse.Namespace) -> None:
                             joint = command.joint
                         command_name = command.action.value
                         last_command_at = time.perf_counter()
+                        if _is_drive_action(command.action):
+                            active_drive_template = template
+                            active_drive_until = last_command_at + args.drive_hold_ms / 1000
+                            last_drive_repeat_at = last_command_at
+                        else:
+                            active_drive_template = None
                     except Exception:
                         command_name = "send_failed"
+                        active_drive_template = None
+
+            now = time.perf_counter()
+            if (
+                not command_name
+                and active_drive_template is not None
+                and now <= active_drive_until
+                and (now - last_drive_repeat_at) * 1000 >= args.drive_repeat_ms
+            ):
+                seq += 1
+                command = Command(
+                    seq=seq,
+                    session_id=session_id,
+                    request_id=request_id,
+                    mode=active_drive_template.mode,
+                    action=active_drive_template.action,
+                    speed=active_drive_template.speed,
+                    ttl_ms=active_drive_template.ttl_ms,
+                    token=args.esp32_token,
+                )
+                try:
+                    ack_ms = transport.send(command)
+                    command_name = command.action.value
+                    last_command_at = now
+                    last_drive_repeat_at = now
+                except Exception:
+                    command_name = "send_failed"
+                    active_drive_template = None
+            elif active_drive_template is not None and now > active_drive_until:
+                active_drive_template = None
 
             if (time.perf_counter() - last_command_at) * 1000 > args.deadman_ms:
+                active_drive_template = None
                 seq = _send_stop_safely(transport, mapper, seq, session_id, request_id, mode, args.esp32_token)
                 last_command_at = time.perf_counter()
 
@@ -142,6 +183,10 @@ def run_gateway(args: argparse.Namespace) -> None:
     cap.release()
     cv2.destroyAllWindows()
     cloud.close()
+
+
+def _is_drive_action(action: Action) -> bool:
+    return action in {Action.FORWARD, Action.BACKWARD, Action.LEFT, Action.RIGHT}
 
 
 def _send_stop_safely(transport, mapper: GestureMapper, seq: int, session_id: str, request_id: str, mode: Mode, token: str) -> int:
@@ -186,6 +231,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--speed", type=int, default=180)
     parser.add_argument("--deadman-ms", type=int, default=600)
+    parser.add_argument("--drive-repeat-ms", type=int, default=200)
+    parser.add_argument("--drive-hold-ms", type=int, default=550)
     parser.add_argument("--session-id")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--headless", action="store_true")

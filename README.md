@@ -155,7 +155,9 @@ Chạy gateway:
 .\scripts\run_gateway_azure.ps1 `
   -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
   -Esp32Host "<ESP32_IP>" `
-  -Speed 255
+  -Speed 255 `
+  -DriveRepeatMs 200 `
+  -DriveHoldMs 550
 ```
 
 Gateway kết nối tới:
@@ -678,6 +680,8 @@ Cloud đã chạy model và model thật sự chọn lớp `no_gesture`. Cần:
 
 - Gateway mặc định dùng `-Speed 180`; một số xe cần PWM cao hơn để thắng ma sát.
 - Chạy demo với `-Speed 255`.
+- Nếu xe chỉ giật từng nhịp, tăng thời gian giữ lệnh, ví dụ
+  `-DriveHoldMs 800`, nhưng vẫn phải giữ khả năng dừng an toàn.
 - Nếu `esp32_ack_ms` trong CSV khác 0 nhưng bánh vẫn không quay, kiểm tra nguồn
   motor, GND chung, dây `ENA/ENB` và dây `IN1..IN4`.
 

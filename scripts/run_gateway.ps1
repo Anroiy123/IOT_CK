@@ -5,6 +5,8 @@ param(
   [string]$Esp32Token = "CHANGE_ME",
   [int]$Camera = 0,
   [int]$Speed = 180,
+  [int]$DriveRepeatMs = 200,
+  [int]$DriveHoldMs = 550,
   [string]$Log = "reports/gateway_latency.csv",
   [int]$MaxFrames = 0,
   [switch]$Headless,
@@ -21,6 +23,8 @@ $gatewayArgs = @(
   "--esp32-token", $Esp32Token,
   "--camera", $Camera,
   "--speed", $Speed,
+  "--drive-repeat-ms", $DriveRepeatMs,
+  "--drive-hold-ms", $DriveHoldMs,
   "--log", $Log
 )
 if ($MaxFrames -gt 0) { $gatewayArgs += @("--max-frames", $MaxFrames) }

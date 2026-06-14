@@ -5,6 +5,8 @@ param(
   [string]$Esp32Token = $env:ESP32_COMMAND_TOKEN,
   [int]$Camera = 0,
   [int]$Speed = 180,
+  [int]$DriveRepeatMs = 200,
+  [int]$DriveHoldMs = 550,
   [string]$Log = "reports/gateway_azure_latency.csv",
   [int]$MaxFrames = 0,
   [switch]$Headless,
@@ -34,6 +36,8 @@ $arguments = @{
   Esp32Token = $Esp32Token
   Camera = $Camera
   Speed = $Speed
+  DriveRepeatMs = $DriveRepeatMs
+  DriveHoldMs = $DriveHoldMs
   Log = $Log
   MaxFrames = $MaxFrames
 }
