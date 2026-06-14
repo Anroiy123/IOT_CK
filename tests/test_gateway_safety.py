@@ -39,6 +39,15 @@ def test_stabilizer_ignores_low_confidence_and_resets_sequence():
     assert stabilizer.accept("like", 0.9) is None
 
 
+def test_stabilizer_allows_mode_switch_at_lower_confidence():
+    policy = SafetyPolicy(min_confidence=0.8, mode_min_confidence=0.6, mode_required=2)
+    stabilizer = GestureStabilizer(policy)
+
+    assert stabilizer.accept("rock", 0.62) is None
+    assert stabilizer.accept("rock", 0.63) == "rock"
+    assert stabilizer.accept("like", 0.63) is None
+
+
 def test_latency_log_row_includes_request_and_session_ids():
     row = LatencyLogRow(
         session_id="s1",

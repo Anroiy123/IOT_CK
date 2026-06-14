@@ -6,8 +6,10 @@ from dataclasses import dataclass, fields
 @dataclass(frozen=True)
 class SafetyPolicy:
     normal_required: int = 3
+    mode_required: int = 2
     stop_required: int = 2
     min_confidence: float = 0.80
+    mode_min_confidence: float = 0.60
     no_command_timeout_ms: int = 600
     servo_cooldown_ms: int = 250
 
@@ -20,7 +22,7 @@ class GestureStabilizer:
 
     def accept(self, gesture: str, confidence: float) -> str | None:
         gesture = (gesture or "").strip().lower()
-        if confidence < self.policy.min_confidence or gesture in {"", "no_gesture", "none"}:
+        if gesture in {"", "no_gesture", "none"} or confidence < self._min_confidence_for(gesture):
             self._last_gesture = None
             self._count = 0
             return None
@@ -31,8 +33,20 @@ class GestureStabilizer:
             self._last_gesture = gesture
             self._count = 1
 
-        required = self.policy.stop_required if gesture == "stop" else self.policy.normal_required
+        required = self._required_count_for(gesture)
         return gesture if self._count >= required else None
+
+    def _min_confidence_for(self, gesture: str) -> float:
+        if gesture in {"peace", "rock"}:
+            return self.policy.mode_min_confidence
+        return self.policy.min_confidence
+
+    def _required_count_for(self, gesture: str) -> int:
+        if gesture == "stop":
+            return self.policy.stop_required
+        if gesture in {"peace", "rock"}:
+            return self.policy.mode_required
+        return self.policy.normal_required
 
 
 @dataclass(frozen=True)

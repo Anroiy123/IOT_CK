@@ -160,6 +160,24 @@ Chạy gateway:
   -DriveHoldMs 550
 ```
 
+Khi demo tay máy, `rock` và `peace` dùng ngưỡng riêng thấp hơn để chuyển mode
+nhanh hơn, còn lệnh servo vẫn giữ ngưỡng chính `0.80`:
+
+```powershell
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
+  -Esp32Host "<ESP32_IP>" `
+  -Speed 200 `
+  -ModeMinConfidence 0.60 `
+  -ModeRequired 2 `
+  -MinConfidence 0.80 `
+  -NormalRequired 3 `
+  -ServoCooldownMs 350
+```
+
+Luồng thao tác tay máy: đưa `rock` để vào `arm`, dùng `one/two` để chọn khớp,
+dùng `like/dislike` để tăng/giảm góc, và dùng `peace` để quay lại `car`.
+
 Gateway kết nối tới:
 
 ```text
@@ -736,8 +754,8 @@ tests/                    Pytest
 - Dataset chưa cân bằng hoàn toàn giữa các lớp.
 - CNN-LSTM chưa được huấn luyện và đánh giá đầy đủ.
 - Chưa có báo cáo hoàn chỉnh theo nền đơn giản/phức tạp và false activation.
-- `servo_cooldown_ms=250` đã có trong policy nhưng chưa được áp dụng trong
-  vòng lặp gửi lệnh gateway.
+- Servo command đã có cooldown; nếu tay máy còn giật hoặc nhầm khớp, cần đo
+  thêm log theo từng khớp và cải thiện dataset cho `one/two/like/dislike`.
 - Cần đo thêm latency nhiều phiên và tách cold start/warm request.
 
 ## Tài liệu liên quan

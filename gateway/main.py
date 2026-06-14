@@ -21,7 +21,16 @@ from gateway.transport import DryRunTransport, WebSocketTransport
 def run_gateway(args: argparse.Namespace) -> None:
     session_id = args.session_id or str(uuid.uuid4())
     mapper = GestureMapper(speed=args.speed)
-    stabilizer = GestureStabilizer(SafetyPolicy())
+    stabilizer = GestureStabilizer(
+        SafetyPolicy(
+            normal_required=args.normal_required,
+            mode_required=args.mode_required,
+            stop_required=args.stop_required,
+            min_confidence=args.min_confidence,
+            mode_min_confidence=args.mode_min_confidence,
+            servo_cooldown_ms=args.servo_cooldown_ms,
+        )
+    )
     cropper = MediaPipeCropper()
     cloud = CloudGestureClient(args.cloud_url, args.api_key)
     transport = DryRunTransport() if args.dry_run else WebSocketTransport(args.esp32_ws)
@@ -32,6 +41,7 @@ def run_gateway(args: argparse.Namespace) -> None:
     active_drive_template: Command | None = None
     active_drive_until = 0.0
     last_drive_repeat_at = 0.0
+    last_servo_command_at = 0.0
     args.log.parent.mkdir(parents=True, exist_ok=True)
 
     cap = cv2.VideoCapture(args.camera)
@@ -93,35 +103,41 @@ def run_gateway(args: argparse.Namespace) -> None:
             if accepted:
                 template = mapper.map_gesture(accepted, mode, joint=joint)
                 if template is not None:
-                    seq += 1
-                    command = Command(
-                        seq=seq,
-                        session_id=session_id,
-                        request_id=request_id,
-                        mode=template.mode,
-                        action=template.action,
-                        speed=template.speed,
-                        joint=template.joint,
-                        delta=template.delta,
-                        ttl_ms=template.ttl_ms,
-                        token=args.esp32_token,
-                    )
-                    try:
-                        ack_ms = transport.send(command)
-                        mode = command.mode
-                        if command.joint:
-                            joint = command.joint
-                        command_name = command.action.value
-                        last_command_at = time.perf_counter()
-                        if _is_drive_action(command.action):
-                            active_drive_template = template
-                            active_drive_until = last_command_at + args.drive_hold_ms / 1000
-                            last_drive_repeat_at = last_command_at
-                        else:
+                    now = time.perf_counter()
+                    if _is_arm_action(template.action) and (now - last_servo_command_at) * 1000 < args.servo_cooldown_ms:
+                        command_name = "cooldown"
+                    else:
+                        seq += 1
+                        command = Command(
+                            seq=seq,
+                            session_id=session_id,
+                            request_id=request_id,
+                            mode=template.mode,
+                            action=template.action,
+                            speed=template.speed,
+                            joint=template.joint,
+                            delta=template.delta,
+                            ttl_ms=template.ttl_ms,
+                            token=args.esp32_token,
+                        )
+                        try:
+                            ack_ms = transport.send(command)
+                            mode = command.mode
+                            if command.joint:
+                                joint = command.joint
+                            command_name = command.action.value
+                            last_command_at = time.perf_counter()
+                            if _is_drive_action(command.action):
+                                active_drive_template = template
+                                active_drive_until = last_command_at + args.drive_hold_ms / 1000
+                                last_drive_repeat_at = last_command_at
+                            else:
+                                active_drive_template = None
+                            if _is_arm_action(command.action):
+                                last_servo_command_at = last_command_at
+                        except Exception:
+                            command_name = "send_failed"
                             active_drive_template = None
-                    except Exception:
-                        command_name = "send_failed"
-                        active_drive_template = None
 
             now = time.perf_counter()
             if (
@@ -192,6 +208,10 @@ def _is_drive_action(action: Action) -> bool:
     return action in {Action.FORWARD, Action.BACKWARD, Action.LEFT, Action.RIGHT}
 
 
+def _is_arm_action(action: Action) -> bool:
+    return action in {Action.ARM_DELTA, Action.SELECT_JOINT}
+
+
 def _initial_sequence(esp32_ws: str) -> int:
     try:
         parsed = urlparse(esp32_ws)
@@ -247,6 +267,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--speed", type=int, default=180)
     parser.add_argument("--deadman-ms", type=int, default=600)
+    parser.add_argument("--min-confidence", type=float, default=0.80)
+    parser.add_argument("--mode-min-confidence", type=float, default=0.60)
+    parser.add_argument("--normal-required", type=int, default=3)
+    parser.add_argument("--mode-required", type=int, default=2)
+    parser.add_argument("--stop-required", type=int, default=2)
+    parser.add_argument("--servo-cooldown-ms", type=int, default=250)
     parser.add_argument("--drive-repeat-ms", type=int, default=200)
     parser.add_argument("--drive-hold-ms", type=int, default=550)
     parser.add_argument("--session-id")
