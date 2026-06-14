@@ -1,138 +1,226 @@
 # IOT_CK - Nhận dạng cử chỉ điều khiển xe và tay máy
 
-Đề tài xây dựng hệ thống nhận dạng cử chỉ tay bằng Deep Learning để điều khiển
-xe và tay máy qua ESP32.
+Đề tài sử dụng webcam trên laptop để nhận dạng cử chỉ tay bằng mô hình CNN,
+sau đó gửi lệnh qua Wi-Fi tới ESP32 để điều khiển xe và tay máy.
 
-Kiến trúc đang sử dụng:
+## Kiến trúc hiện tại
 
 ```text
 Webcam laptop
-  -> Gateway: MediaPipe phát hiện/cắt bàn tay
-  -> FastAPI + CNN (Hugging Face Spaces hoặc chạy local)
-  -> Gateway lọc kết quả và ánh xạ lệnh
+  -> Gateway trên laptop
+     - MediaPipe phát hiện và cắt vùng bàn tay
+     - gửi ảnh JPEG tới Azure
+  -> FastAPI + CNN trên Azure Container Apps
+  -> Gateway lọc confidence và ánh xạ cử chỉ thành lệnh
   -> WebSocket qua Wi-Fi
   -> ESP32
   -> L298N + motor / PCA9685 + servo
 ```
 
-ESP32 không xử lý ảnh và không cần nối USB với laptop khi vận hành. USB chỉ cần
-để nạp firmware, xem Serial Monitor hoặc cấp nguồn tạm thời.
+Azure là cloud chính của bản demo hiện tại. Local FastAPI được giữ làm fallback
+và để benchmark. Hugging Face Spaces chỉ còn là phương án triển khai phụ.
 
-## Trạng thái hiện tại
+ESP32 không xử lý ảnh. Khi vận hành qua Wi-Fi, ESP32 không bắt buộc nối USB với
+laptop; USB chỉ cần để nạp firmware, xem Serial Monitor hoặc cấp nguồn tạm thời.
 
-Cập nhật ngày 13/06/2026:
+## Trạng thái dự án
 
-- Firmware ESP32 đã điều khiển được motor và bốn servo.
-- Kênh điều khiển chính là WebSocket; HTTP chỉ dùng cho `/health` và `/state`.
-- Gateway có giao diện camera, MediaPipe hand gate, safety filter và log CSV.
-- CNN MobileNetV3Small đã được huấn luyện với dữ liệu của 5 người.
-- FastAPI đã chạy local và đã deploy lên Hugging Face Spaces miễn phí.
-- Connection pooling được dùng để giảm RTT cloud sau warm-up.
+Cập nhật ngày 14/06/2026:
+
+- Firmware ESP32 điều khiển được motor và bốn servo.
+- Gateway điều khiển ESP32 bằng WebSocket; HTTP `/health` và `/state` chỉ dùng
+  để kiểm tra.
+- Gateway có camera UI, MediaPipe crop, safety filter, log CSV,
+  `session_id` và `request_id`.
+- CNN baseline MobileNetV3Small đã được huấn luyện bằng dữ liệu của 5 người.
+- Model đã được đóng gói trong image trên GitHub Container Registry (GHCR).
+- API đang chạy trên Azure Container Apps tại Japan East.
 - Bộ test hiện tại: `28 passed`.
 
-Hugging Face Space:
-
-- Trang Space: <https://huggingface.co/spaces/anroiy/iot-ck-gesture-api>
-- API: <https://anroiy-iot-ck-gesture-api.hf.space>
-- Swagger: <https://anroiy-iot-ck-gesture-api.hf.space/docs>
-
-## Kết quả hiện tại
-
-### Dataset
-
-| Thành phần | Giá trị |
-|---|---:|
-| Số người | 5 (`s01` đến `s05`) |
-| Số lớp | 8 |
-| Số clip | 570 |
-| Số frame | 8.550 |
-| Train | 5.400 frame |
-| Validation | 1.350 frame |
-| Test | 1.800 frame |
-| Chiến lược chia | Theo người, không chia ngẫu nhiên theo frame |
-
-`s05` hiện có 90 clip, ít hơn `s01`-`s04` (120 clip/người). Hai lớp
-`peace` và `no_gesture` có 60 clip/lớp; các lớp còn lại có 75 clip/lớp.
-
-### CNN baseline
-
-Model đang dùng:
+Azure API hiện tại:
 
 ```text
-models/gesture-cnn-baseline-s05-partial.keras
+https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io
 ```
 
-| Chỉ số test | Giá trị |
-|---|---:|
-| Accuracy | 83,33% |
-| Macro F1 | 83,37% |
-| Kích thước ảnh | 160 x 160 |
-| Backbone | MobileNetV3Small, ImageNet pretrained |
+Kiểm tra:
 
-Chi tiết từng lớp và confusion matrix:
+```powershell
+$AzureUrl = "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io"
+Invoke-RestMethod "$AzureUrl/health"
+Invoke-RestMethod "$AzureUrl/v1/model"
+```
+
+Kết quả mong đợi:
+
+```json
+{"status":"ok"}
+```
+
+```json
+{"model_version":"cnn-s05-partial-v1","model_type":"cnn"}
+```
+
+## Chạy nhanh
+
+Các lệnh trong phần này chạy tại thư mục project trên laptop, không chạy trong
+Azure Cloud Shell:
+
+```powershell
+cd "C:\Users\hunga\OneDrive\Desktop\project\IOT_CK"
+```
+
+### 1. Chuẩn bị môi trường Python
+
+Yêu cầu:
+
+- Windows 10/11.
+- Python 3.11.
+- Webcam laptop hoặc webcam USB.
+- VS Code và PlatformIO nếu cần nạp lại firmware.
+
+Tạo môi trường:
+
+```powershell
+py -3.11 -m venv .venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Không dùng Python 3.14 cho môi trường TensorFlow của project này.
+
+### 2. Tạo file `.env`
+
+Tạo `.env` tại thư mục gốc:
+
+```dotenv
+AZURE_GESTURE_API_KEY=KHOA_API_DA_DAT_TREN_AZURE
+ESP32_COMMAND_TOKEN=TOKEN_DA_NAP_VAO_ESP32
+```
+
+Không thêm dấu `<` và `>` vào giá trị thật. Ví dụ `"<API_KEY>"` chỉ là
+placeholder trong tài liệu và sẽ bị Azure từ chối.
+
+Hai khóa có mục đích khác nhau:
+
+| Biến | Nơi sử dụng | Mục đích |
+|---|---|---|
+| `AZURE_GESTURE_API_KEY` | Gateway và Azure API | Xác thực request `/v1/predict` |
+| `ESP32_COMMAND_TOKEN` | Gateway và firmware ESP32 | Xác thực lệnh WebSocket |
+
+Các khóa này do nhóm tự đặt, không lấy từ Azure Portal hoặc Hugging Face.
+`.env` đã được Git ignore; không commit secret lên GitHub.
+
+Nếu quên Azure API key, đặt một key mới:
+
+```powershell
+$NewApiKey = "TAO_MOT_KHOA_MOI_DU_DAI"
+
+az containerapp update `
+  --name iot-ck-gesture-api `
+  --resource-group rg-iot-ck-gesture `
+  --set-env-vars GESTURE_API_KEY=$NewApiKey
+
+$env:AZURE_GESTURE_API_KEY = $NewApiKey
+```
+
+Sau đó cập nhật cùng giá trị vào `.env`.
+
+### 3. Kiểm tra camera và Azure, chưa chạy xe
+
+```powershell
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
+  -DryRun
+```
+
+`-DryRun` vẫn mở camera và gọi model Azure nhưng không gửi lệnh tới ESP32.
+Nhấn `q` để thoát.
+
+### 4. Chạy thật với ESP32
+
+Đảm bảo laptop và ESP32 cùng mạng Wi-Fi, sau đó lấy địa chỉ IP từ Serial
+Monitor hoặc router:
+
+```powershell
+Invoke-RestMethod "http://<ESP32_IP>/health"
+Invoke-RestMethod "http://<ESP32_IP>/state"
+```
+
+Chạy gateway:
+
+```powershell
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
+  -Esp32Host "<ESP32_IP>"
+```
+
+Gateway kết nối tới:
 
 ```text
-reports/cnn_baseline_s05_partial_metrics.json
+ws://<ESP32_IP>:81/
 ```
-
-### Latency Hugging Face
-
-Số liệu từ `reports/gateway_huggingface_latency.csv`, chỉ tính các frame thực
-sự phát hiện tay và gọi cloud:
-
-| Thành phần | Median | p95 |
-|---|---:|---:|
-| Capture | 2,1 ms | 5,8 ms |
-| MediaPipe + JPEG | 13,6 ms | 26,9 ms |
-| Cloud RTT | 338,2 ms | 821,1 ms |
-| Inference trên Space | 76,7 ms | 105,2 ms |
-| ESP32 ACK (các frame có lệnh) | 69,1 ms | 137,0 ms |
-| End-to-end gateway | 362,2 ms | 845,0 ms |
-
-Model trên cloud không phải bottleneck chính; phần lớn latency đến từ mạng tới
-Hugging Face. Vì vậy:
-
-- **Cloud mode** dùng để chứng minh kiến trúc cloud và đo latency.
-- **Local mode** nên dùng khi demo xe cần phản hồi nhanh và ổn định.
 
 ## Cử chỉ và chức năng
 
 | Label | Cách làm tay | Chế độ xe | Chế độ tay máy |
 |---|---|---|---|
-| `stop` | Xòe bàn tay, 5 ngón rõ | Dừng xe | Dừng motor |
-| `peace` | Chữ V rộng | Chuyển sang chế độ xe | Chuyển sang chế độ xe |
-| `rock` | Ngón trỏ và ngón út | Chuyển sang tay máy | Chuyển sang tay máy |
+| `stop` | Xòe bàn tay, năm ngón rõ | Dừng xe | Dừng motor |
+| `peace` | Chữ V mở rộng | Chuyển sang chế độ xe | Chuyển sang chế độ xe |
+| `rock` | Giơ ngón trỏ và ngón út | Chuyển sang chế độ tay máy | Giữ chế độ tay máy |
 | `like` | Ngón cái hướng lên | Tiến | Tăng góc khớp 5 độ |
 | `dislike` | Ngón cái hướng xuống | Lùi | Giảm góc khớp 5 độ |
 | `one` | Một ngón trỏ | Rẽ trái | Chọn khớp trước |
-| `two` | Hai ngón sát nhau | Rẽ phải | Chọn khớp tiếp |
-| `no_gesture` | Không có tay hợp lệ | Không phát lệnh | Không phát lệnh |
+| `two` | Hai ngón giữ sát nhau | Rẽ phải | Chọn khớp tiếp |
+| `no_gesture` | Không có cử chỉ hợp lệ | Không phát lệnh | Không phát lệnh |
 
-Thứ tự khớp tay máy:
+Thứ tự khớp:
 
 ```text
 base -> lower -> upper -> gripper
 ```
 
-`peace` và `two` dễ nhầm. Khi thu dữ liệu, `peace` nên tạo chữ V rộng, còn
-`two` giữ hai ngón sát và thẳng.
+`peace` và `two` dễ nhầm. Khi thao tác và thu dữ liệu, `peace` cần tạo chữ V
+rộng; `two` giữ hai ngón gần nhau và thẳng.
+
+## Luồng xử lý gateway
+
+1. Đọc frame từ webcam.
+2. MediaPipe tìm bàn tay và crop vùng quan tâm nếu tìm thấy.
+3. Gateway mã hóa ảnh thành JPEG và gọi Azure `/v1/predict`.
+4. Gateway nhận `gesture`, `confidence`, `inference_ms` và model version.
+5. Safety filter yêu cầu kết quả đủ tin cậy và ổn định.
+6. Gesture mapper chuyển cử chỉ thành lệnh xe hoặc tay máy.
+7. Gateway gửi JSON qua WebSocket tới ESP32.
+8. ESP32 trả ACK và gateway ghi toàn bộ thời gian vào CSV.
+
+Mặc định gateway vẫn gọi cloud khi MediaPipe không phát hiện được tay; trường
+hợp đó ảnh toàn frame được gửi lên model. Chỉ dùng tùy chọn sau khi muốn bỏ qua
+cloud nếu MediaPipe không thấy tay:
+
+```powershell
+-SkipCloudWithoutHand
+```
+
+UI camera được lật ngang để hoạt động như gương. Việc lật chỉ áp dụng cho ảnh
+hiển thị; ảnh gửi tới model không bị lật.
 
 ## Cơ chế an toàn
 
-- Cử chỉ thường cần confidence >= 0,80 và lặp 3 lần liên tiếp.
-- `stop` cần 2 kết quả liên tiếp.
-- Không thấy bàn tay thì MediaPipe trả `no_gesture` và không gọi cloud.
-- Camera lỗi, cloud timeout hoặc WebSocket lỗi thì gateway cố gửi `stop`.
-- ESP32 từ chối token sai, sequence cũ và TTL không hợp lệ.
+- Cử chỉ thường cần confidence từ `0.80` và xuất hiện 3 lần liên tiếp.
+- `stop` cần confidence từ `0.80` và xuất hiện 2 lần liên tiếp.
+- Gateway gửi `stop` khi camera lỗi, cloud lỗi, WebSocket lỗi hoặc quá thời
+  gian deadman 600 ms.
+- ESP32 từ chối command token sai, sequence cũ và TTL không hợp lệ.
 - ESP32 tự dừng motor nếu không nhận lệnh hợp lệ trong 600 ms.
-- Servo bị giới hạn góc theo từng khớp và chỉ thay đổi 5 độ mỗi lệnh.
+- Servo bị giới hạn góc riêng cho từng khớp và thay đổi 5 độ mỗi lệnh.
 
 Không hạ confidence hoặc số lần xác nhận chỉ để xe phản hồi nhanh hơn nếu chưa
-đánh giá lại false activation.
+đo lại false activation.
 
 ## Phần cứng và pinout
-
-Pinout firmware hiện tại:
 
 | Chức năng | ESP32 GPIO |
 |---|---:|
@@ -145,71 +233,28 @@ Pinout firmware hiện tại:
 | PCA9685 SDA | 21 |
 | PCA9685 SCL | 22 |
 
-PCA9685 dùng địa chỉ `0x40`, tần số 50 Hz. Servo dùng channel 0-3 theo thứ tự
-`base`, `lower`, `upper`, `gripper`.
+Thông số firmware:
 
-GPIO12 là strapping pin. Nếu ESP32 khởi động không ổn định, chuyển IN1 sang
-GPIO33 và cập nhật `PIN_IN1` trong config.
+- PCA9685: địa chỉ `0x40`, tần số 50 Hz.
+- WebSocket: port `81`.
+- HTTP debug: port `80`.
+- PWM motor: 5 kHz, độ phân giải 8 bit.
+- Watchdog command: 600 ms.
+- Servo channel 0-3: `base`, `lower`, `upper`, `gripper`.
 
-Motor và servo phải dùng nguồn phù hợp, chung GND với ESP32. Không cấp toàn bộ
+Khi boot, motor được dừng và PWM bằng 0. Firmware hiện đưa bốn servo về các góc
+khởi tạo `90`, `90`, `90`, `60`; vì vậy servo có thể chuyển động ngay sau khi
+ESP32 khởi động.
+
+GPIO12 là strapping pin. Nếu ESP32 boot không ổn định, chuyển dây IN1 sang
+GPIO33 và cập nhật `PIN_IN1` trong `firmware/include/config.h`.
+
+Motor và servo phải có nguồn phù hợp và chung GND với ESP32. Không cấp toàn bộ
 motor/servo trực tiếp từ chân 5V của ESP32.
 
-## Cấu trúc repository
+## Cấu hình và nạp firmware
 
-```text
-firmware/                 PlatformIO firmware cho ESP32
-arduino/                  Bản Arduino IDE/phần thử nghiệm phần cứng
-gateway/                  Webcam, MediaPipe, cloud client, safety, WebSocket
-cloud/                    FastAPI và model inference
-ml/                       Thu dữ liệu, split, CNN, CNN-LSTM, benchmark
-common/                   Protocol, label và ánh xạ cử chỉ
-deploy/huggingface/       Docker Space configuration
-data/                     Metadata và dữ liệu thu
-models/                   Model đã huấn luyện
-reports/                  Metrics, latency log và kết quả đánh giá
-scripts/                  Script setup, chạy gateway và deploy
-tests/                    Pytest
-```
-
-## Yêu cầu môi trường
-
-- Windows 10/11 và PowerShell.
-- Python 3.11. Không dùng Python 3.14 cho TensorFlow hiện tại.
-- VS Code + PlatformIO hoặc PlatformIO CLI.
-- ESP32 DevKit kết nối Wi-Fi cùng mạng với laptop.
-- Webcam laptop/USB.
-
-Tạo môi trường:
-
-```powershell
-py -3.11 -m venv .venv
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Hoặc chạy script setup:
-
-```powershell
-.\scripts\setup_windows.ps1
-```
-
-Kiểm tra:
-
-```powershell
-.\.venv\Scripts\python.exe --version
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-## Cấu hình bí mật
-
-Không commit SSID, mật khẩu, command token hoặc API key.
-
-### ESP32
-
-Tạo/chỉnh:
+File bí mật:
 
 ```text
 firmware/include/config.h
@@ -223,109 +268,190 @@ Các giá trị bắt buộc:
 #define COMMAND_TOKEN "TOKEN_DIEU_KHIEN"
 ```
 
-Giữ các hằng số pinout có sẵn trong file. `firmware/include/config.h` đã được
-Git ignore.
+`COMMAND_TOKEN` phải trùng với `ESP32_COMMAND_TOKEN` trong `.env`.
 
-### Gateway
-
-Tạo file `.env` ở root:
-
-```dotenv
-GESTURE_API_KEY=API_KEY_CUA_CLOUD_API
-ESP32_COMMAND_TOKEN=TOKEN_DIEU_KHIEN
-```
-
-`.env` đã được Git ignore. API key cloud và command token ESP32 có thể khác
-nhau; không dùng Hugging Face access token làm API key của ứng dụng.
-
-Phân biệt hai token quan trọng:
-
-- `GESTURE_API_KEY`: khóa bí mật của API nhận dạng cử chỉ trên cloud. Gateway
-  gửi khóa này trong header `X-API-Key` khi gọi `/v1/predict`.
-- `ESP32_COMMAND_TOKEN`: khóa điều khiển ESP32. Gateway gửi khóa này trong gói
-  WebSocket để ESP32 từ chối lệnh lạ.
-
-Hai khóa này do nhóm tự đặt, không phải lấy từ Azure Portal, Hugging Face hay
-Google Cloud. Không commit giá trị thật vào GitHub.
-
-## Nạp firmware ESP32
-
-Mặc định PlatformIO dùng board `esp32dev`, port upload/monitor `COM5`.
-
-Build:
+Build firmware:
 
 ```powershell
 .\.venv\Scripts\pio.exe run -d firmware
 ```
 
-Upload:
+Upload vào ESP32 trên `COM5`:
 
 ```powershell
 .\.venv\Scripts\pio.exe run -d firmware -t upload
 ```
 
-Serial Monitor:
+Mở Serial Monitor:
 
 ```powershell
 .\.venv\Scripts\pio.exe device monitor -p COM5 -b 115200
 ```
 
-Sau khi khởi động, Serial Monitor in IP Wi-Fi của ESP32. IP có thể thay đổi khi
-router cấp DHCP lại.
+PIO Home không bắt buộc để build hoặc upload.
 
-Kiểm tra qua Wi-Fi:
+## Gateway UI và log
 
-```powershell
-Invoke-RestMethod http://<ESP32_IP>/health
-Invoke-RestMethod http://<ESP32_IP>/state
+Cửa sổ gateway hiển thị:
+
+- Mode hiện tại: `car` hoặc `arm`.
+- Gesture và confidence model trả về.
+- Tổng latency của frame.
+- Command vừa gửi.
+
+Log Azure mặc định:
+
+```text
+reports/gateway_azure_latency.csv
 ```
 
-Kết quả `/health` mong đợi:
+Mỗi dòng gồm:
+
+- `session_id`, `request_id`.
+- Gesture, confidence, mode và command.
+- Thời gian capture và preprocessing.
+- Cloud RTT và model inference.
+- ESP32 ACK và tổng latency.
+
+Nên tạo file log riêng cho mỗi phiên đo:
+
+```powershell
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
+  -DryRun `
+  -Log "reports\gateway_azure_demo_01.csv"
+```
+
+## Cloud API
+
+### `GET /health`
+
+Trả trạng thái hoạt động:
 
 ```json
 {"status":"ok"}
 ```
 
-HTTP không dùng để gửi lệnh điều khiển. Gateway gửi JSON qua:
+### `GET /v1/model`
+
+Trả model đang được load:
+
+```json
+{"model_version":"cnn-s05-partial-v1","model_type":"cnn"}
+```
+
+### `POST /v1/predict`
+
+Header:
 
 ```text
-ws://<ESP32_IP>:81/
+X-API-Key: KHOA_API_DA_DAT_TREN_AZURE
 ```
 
-## Chạy hệ thống
+Body cho một ảnh:
 
-### 1. Cloud mode - Hugging Face
-
-Chế độ này đúng kiến trúc cloud của đề tài nhưng phụ thuộc Internet và có thể
-có cold start.
-
-Kiểm tra camera + cloud, không gửi lệnh tới ESP32:
-
-```powershell
-.\scripts\run_gateway_huggingface.ps1 -DryRun
+```json
+{
+  "image_b64": "JPEG_BASE64",
+  "session_id": "demo-session",
+  "request_id": "request-001"
+}
 ```
 
-Chạy thật:
+Gateway hiện gửi danh sách ảnh bằng trường `images_b64`; API hỗ trợ cả
+`image_b64` và `images_b64`.
 
-```powershell
-.\scripts\run_gateway_huggingface.ps1 -Esp32Host <ESP32_IP>
+Response:
+
+```json
+{
+  "gesture": "like",
+  "confidence": 0.91,
+  "inference_ms": 68.2,
+  "model_version": "cnn-s05-partial-v1",
+  "model_type": "cnn",
+  "session_id": "demo-session",
+  "request_id": "request-001"
+}
 ```
 
-Nhấn `q` để thoát. Log mặc định:
+## Azure Container Apps
+
+Luồng build và deploy:
 
 ```text
-reports/gateway_huggingface_latency.csv
+GitHub Actions
+  -> build deploy/azure/Dockerfile
+  -> đóng gói FastAPI + model CNN
+  -> push ghcr.io/anroiy123/iot-ck-gesture-api:azure
+  -> Azure Container Apps kéo image từ GHCR
 ```
 
-Nếu Space vừa ngủ, request đầu có thể chậm. Mở `/health` trước khi demo:
+Tài nguyên hiện tại:
+
+| Thành phần | Giá trị |
+|---|---|
+| Subscription | Azure for Students |
+| Resource group | `rg-iot-ck-gesture` |
+| Environment | `iot-ck-env` |
+| Container App | `iot-ck-gesture-api` |
+| Region | Japan East |
+| Image | `ghcr.io/anroiy123/iot-ck-gesture-api:azure` |
+| CPU/RAM | 1 CPU / 2 GiB |
+| Min replicas hiện tại | 1 |
+| Max replicas | 1 |
+
+Model `models/gesture-cnn-baseline-s05-partial.keras` nằm trong GitHub
+repository và được copy trực tiếp vào image. Azure không tải model từ Hugging
+Face khi container khởi động.
+
+### Deploy hoặc cập nhật
+
+Chạy trong Bash/Azure Cloud Shell:
+
+```bash
+git clone https://github.com/Anroiy123/IOT_CK.git
+cd IOT_CK
+export GESTURE_API_KEY="KHOA_API_TU_DAT"
+bash scripts/deploy_azure_container_app.sh
+```
+
+Script tự thử các region fallback nếu Azure for Students chặn region ban đầu.
+Script deploy mặc định với `min-replicas=0` và `max-replicas=1`. Sau lần
+deploy gần nhất, app đã được chỉnh thủ công thành `min-replicas=1` để phục vụ
+demo.
+
+### Cấu hình trước và sau demo
+
+Giữ một replica khi demo để giảm cold start:
 
 ```powershell
-Invoke-RestMethod https://anroiy-iot-ck-gesture-api.hf.space/health
+az containerapp update `
+  --name iot-ck-gesture-api `
+  --resource-group rg-iot-ck-gesture `
+  --min-replicas 1 `
+  --max-replicas 1
 ```
 
-### 2. Local mode - ưu tiên khi điều khiển xe
+Sau demo, cho phép scale về 0 để giảm chi phí:
 
-Terminal 1, chạy FastAPI và model trên laptop:
+```powershell
+az containerapp update `
+  --name iot-ck-gesture-api `
+  --resource-group rg-iot-ck-gesture `
+  --min-replicas 0 `
+  --max-replicas 1
+```
+
+Azure for Students vẫn có thể phát sinh chi phí nếu vượt hạn mức. Theo dõi
+Cost Management và budget alert trong Azure Portal.
+
+## Chạy local làm fallback
+
+Local mode vẫn giữ luồng `gateway -> FastAPI -> model -> gateway -> ESP32`,
+nhưng bỏ RTT Internet.
+
+Terminal 1:
 
 ```powershell
 .\scripts\run_cloud_local.ps1
@@ -334,109 +460,112 @@ Terminal 1, chạy FastAPI và model trên laptop:
 Kiểm tra:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8001/health
-Start-Process http://127.0.0.1:8001/docs
+Invoke-RestMethod "http://127.0.0.1:8001/health"
+Invoke-RestMethod "http://127.0.0.1:8001/v1/model"
+Start-Process "http://127.0.0.1:8001/docs"
 ```
 
-Terminal 2, chạy gateway:
-
-```powershell
-$env:ESP32_COMMAND_TOKEN="TOKEN_DIEU_KHIEN"
-.\scripts\run_gateway.ps1 `
-  -CloudUrl http://127.0.0.1:8001 `
-  -ApiKey local-dev `
-  -Esp32Host <ESP32_IP> `
-  -Esp32Token $env:ESP32_COMMAND_TOKEN
-```
-
-Local mode vẫn giữ pipeline MediaPipe -> FastAPI -> gateway -> ESP32, nhưng bỏ
-RTT Internet nên phù hợp hơn khi quay demo xe.
-
-### 3. Chạy gateway không điều khiển xe
-
-Thêm `-DryRun` để xử lý camera, model và log nhưng không gửi lệnh tới ESP32:
+Terminal 2, dry-run:
 
 ```powershell
 .\scripts\run_gateway.ps1 `
-  -CloudUrl http://127.0.0.1:8001 `
-  -ApiKey local-dev `
+  -CloudUrl "http://127.0.0.1:8001" `
+  -ApiKey "local-dev" `
   -DryRun
 ```
 
-## Gateway UI và log
+Chạy thật:
 
-Cửa sổ gateway hiển thị:
-
-- Mode hiện tại: `car` hoặc `arm`.
-- Gesture và confidence.
-- Tổng latency của frame.
-- Command vừa gửi.
-
-CSV log gồm:
-
-- `session_id`, `request_id`.
-- Capture và preprocessing latency.
-- Cloud RTT và model inference latency.
-- ESP32 ACK latency.
-- Gesture, confidence, mode và command.
-
-Mỗi phiên demo nên dùng file log riêng để không trộn số liệu cũ.
-
-## Cloud API
-
-### `GET /health`
-
-```json
-{"status":"ok"}
+```powershell
+.\scripts\run_gateway.ps1 `
+  -CloudUrl "http://127.0.0.1:8001" `
+  -ApiKey "local-dev" `
+  -Esp32Host "<ESP32_IP>" `
+  -Esp32Token $env:ESP32_COMMAND_TOKEN
 ```
 
-### `GET /v1/model`
+## Hugging Face Spaces
 
-Trả model version và model type.
+Repo vẫn giữ cấu hình trong `deploy/huggingface/` và script
+`scripts/deploy_huggingface_space.ps1` để đối chiếu cloud provider. Đây không
+phải backend chính của bản demo hiện tại.
 
-### `POST /v1/predict`
+## Dataset và model
 
-Header:
+### Dataset hiện tại
+
+| Thành phần | Giá trị |
+|---|---:|
+| Số người | 5 (`s01` đến `s05`) |
+| Số lớp | 8 |
+| Số clip | 570 |
+| Số frame | 8.550 |
+| Train | 5.400 frame |
+| Validation | 1.350 frame |
+| Test | 1.800 frame |
+| Cách chia | Theo người |
+
+`s05` có 90 clip; `s01`-`s04` có 120 clip/người. `peace` và `no_gesture`
+có 900 frame/lớp; sáu lớp còn lại có 1.125 frame/lớp.
+
+Các cột `split` trong `data/metadata.csv` hiện chưa được ghi trực tiếp. Số liệu
+train/validation/test ở trên lấy từ file metrics của lần huấn luyện theo người.
+
+### CNN baseline bắt buộc
+
+Model đang dùng:
 
 ```text
-X-API-Key: <GESTURE_API_KEY>
+models/gesture-cnn-baseline-s05-partial.keras
 ```
 
-Body:
+| Chỉ số test | Giá trị |
+|---|---:|
+| Accuracy | 83,33% |
+| Macro F1 | 83,37% |
+| Kích thước ảnh | 160 x 160 |
+| Backbone | MobileNetV3Small |
+| Pretrained | ImageNet |
 
-```json
-{
-  "image_b64": "<JPEG_BASE64>",
-  "session_id": "demo-session",
-  "request_id": "request-001"
-}
+Metrics đầy đủ:
+
+```text
+reports/cnn_baseline_s05_partial_metrics.json
 ```
 
-Response:
+CNN-LSTM là mô hình so sánh nâng cao. Repo hiện có kiến trúc
+`TimeDistributed(MobileNetV3Small) -> LSTM(64) -> Softmax`, nhưng chưa có kết
+quả huấn luyện/đánh giá hoàn chỉnh để thay CNN baseline.
 
-```json
-{
-  "gesture": "like",
-  "confidence": 0.91,
-  "inference_ms": 82.4,
-  "model_version": "cnn-s05-partial-v1",
-  "model_type": "cnn",
-  "session_id": "demo-session",
-  "request_id": "request-001"
-}
+### Huấn luyện CNN
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.train_cnn `
+  --epochs 10 `
+  --batch-size 16 `
+  --output-model "models/gesture-cnn-baseline.keras" `
+  --metrics-out "reports/cnn_baseline_metrics.json"
+```
+
+Benchmark inference local:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.benchmark_local `
+  --model-path "models/gesture-cnn-baseline-s05-partial.keras" `
+  --iterations 30
 ```
 
 ## Thu dữ liệu
 
-Quy ước mặc định:
+Quy ước:
 
-- Mỗi clip dài 1,5 giây.
+- Mỗi clip khoảng 1,5 giây.
 - 10 FPS, khoảng 15 frame/clip.
 - Ảnh crop được resize về 160 x 160.
-- Dữ liệu lưu trong `data/raw/<subject>/<gesture>/<clip_id>/`.
-- Metadata lưu trong `data/metadata.csv`.
+- Dữ liệu nằm tại `data/raw/<subject>/<gesture>/<clip_id>/`.
+- Metadata nằm tại `data/metadata.csv`.
 
-Ví dụ thu đủ tám lớp cho một người:
+Ví dụ thu đủ tám lớp:
 
 ```powershell
 .\.venv\Scripts\python.exe -m ml.collect_data `
@@ -446,174 +575,59 @@ Ví dụ thu đủ tám lớp cho một người:
   --lighting bright
 ```
 
-Nhấn `Space` để bắt đầu từng clip, nhấn `q` để dừng.
+Nhấn `Space` để bắt đầu từng clip và `q` để dừng.
 
-Thu lại một lớp:
+Khi thu lại một lớp:
 
-1. Xóa thư mục clip sai trong `data/raw/<subject>/<gesture>/`.
-2. Xóa các dòng tương ứng trong `data/metadata.csv`.
+1. Xóa các clip sai trong `data/raw/<subject>/<gesture>/`.
+2. Xóa đúng các dòng tương ứng khỏi `data/metadata.csv`.
 3. Chạy lại tool với `--labels <gesture>`.
 
-Không chia train/validation/test ngẫu nhiên theo frame vì các frame trong cùng
-clip gần như giống nhau và sẽ gây data leakage.
+Không chia ngẫu nhiên theo frame vì các frame trong cùng clip gần như giống
+nhau và gây data leakage.
 
-## Huấn luyện và đánh giá
+## Kết quả latency hiện có
 
-Huấn luyện CNN baseline:
+### Azure sau warm-up
 
-```powershell
-.\.venv\Scripts\python.exe -m ml.train_cnn `
-  --epochs 10 `
-  --batch-size 16 `
-  --output-model models/gesture-cnn-baseline.keras `
-  --metrics-out reports/cnn_baseline_metrics.json
-```
+Từ các dòng hợp lệ có `cloud_rtt_ms > 0` trong
+`reports/gateway_azure_latency.csv`:
 
-Benchmark local:
+| Thành phần | Median | p95 |
+|---|---:|---:|
+| Cloud RTT | 155,77 ms | 172,89 ms |
+| Inference | 62,36 ms | 72,03 ms |
+| Tổng gateway | 172,32 ms | 194,58 ms |
 
-```powershell
-.\.venv\Scripts\python.exe -m ml.benchmark_local `
-  --model-path models/gesture-cnn-baseline-s05-partial.keras `
-  --iterations 30
-```
+Frame đầu sau khi container/model khởi động có thể chậm hơn đáng kể. Báo cáo
+cold start riêng, không trộn với số liệu warm.
 
-Kiểm tra kiến trúc CNN-LSTM:
+### Hugging Face trước đây
 
-```powershell
-.\.venv\Scripts\python.exe -m ml.train_cnn_lstm --summary
-```
+Các lần đo cũ trên Hugging Face có RTT cao hơn Azure. File
+`reports/gateway_huggingface_latency.csv` được giữ để so sánh provider, không
+đại diện cho backend demo hiện tại.
 
-CNN là baseline bắt buộc. CNN-LSTM hiện mới có phần định nghĩa kiến trúc
-`TimeDistributed(MobileNetV3Small) -> LSTM(64) -> Softmax`; pipeline tạo
-sequence, huấn luyện và đánh giá đầy đủ vẫn cần hoàn thiện.
+## Tiêu chí đánh giá
 
-## Deploy Hugging Face Spaces
+### Mức tối thiểu
 
-Đăng nhập CLI:
+- Nhận dạng và ánh xạ đủ 8 lớp.
+- Chia train/validation/test theo người, không chia ngẫu nhiên theo frame.
+- Báo cáo accuracy, Macro F1, confusion matrix và latency.
+- Có cloud mode, local fallback và log `session_id`/`request_id`.
+- ESP32 dừng khi gateway lỗi hoặc mất lệnh quá 600 ms.
 
-```powershell
-.\.venv\Scripts\huggingface-cli.exe login
-```
+### Mức mục tiêu
 
-Chuẩn bị staging:
+- Macro F1 trên người chưa xuất hiện trong train từ 0,90.
+- Accuracy nền phức tạp giảm không quá 10 điểm phần trăm.
+- False activation trên `no_gesture` dưới 2%.
+- Median end-to-end không quá 300 ms; p95 không quá 500 ms.
+- ESP32 áp dụng lệnh dừng trong 100 ms sau khi nhận.
+- Không brownout khi motor và servo hoạt động đồng thời.
 
-```powershell
-.\scripts\deploy_huggingface_space.ps1 `
-  -Space <HF_USERNAME>/iot-ck-gesture-api `
-  -PrepareOnly
-```
-
-Tạo và upload Space:
-
-```powershell
-.\scripts\deploy_huggingface_space.ps1 `
-  -Space <HF_USERNAME>/iot-ck-gesture-api `
-  -Create
-```
-
-Đặt `GESTURE_API_KEY` trong Settings -> Variables and secrets của Space. Không
-đưa Hugging Face access token hoặc API key vào repository.
-
-Cloud Run vẫn có script `scripts/deploy_cloud_run.ps1`, nhưng project Google
-Cloud hiện yêu cầu kích hoạt billing/prepayment nên không phải lựa chọn demo
-miễn phí của nhóm.
-
-## Deploy Azure Container Apps
-
-Subscription đang dùng nên là `Azure for Students`. Nên dùng Azure Container
-Apps Consumption với `min-replicas=0`, `max-replicas=1` để giảm chi phí. Theo
-tài liệu Azure, Container Apps Consumption có free grant hằng tháng; nếu vượt
-free grant hoặc bật thêm tài nguyên Azure khác thì vẫn có thể phát sinh phí.
-
-Luồng deploy Azure của repo:
-
-```text
-GitHub Actions
-  -> build deploy/azure/Dockerfile
-  -> push image ghcr.io/anroiy123/iot-ck-gesture-api:azure
-  -> Azure Container Apps kéo image public từ GHCR
-```
-
-Model `models/gesture-cnn-baseline-s05-partial.keras` được commit trực tiếp
-trong GitHub repository vì file hiện chỉ khoảng 4,38 MB. Dockerfile Azure copy
-model từ build context, nên pipeline Azure không phụ thuộc Hugging Face.
-
-Các bước:
-
-1. Commit và push các file Azure mới lên GitHub.
-2. Mở GitHub repo `Anroiy123/IOT_CK`.
-3. Vào Actions -> `Build Azure Container Image` -> `Run workflow`.
-4. Chờ image `ghcr.io/anroiy123/iot-ck-gesture-api:azure` build xong.
-5. Mở Azure Portal -> Cloud Shell.
-6. Clone repo và chạy script:
-
-```bash
-git clone https://github.com/Anroiy123/IOT_CK.git
-cd IOT_CK
-export GESTURE_API_KEY="<AZURE_API_KEY>"
-bash scripts/deploy_azure_container_app.sh
-```
-
-`<AZURE_API_KEY>` là chuỗi bí mật do nhóm tự chọn tại thời điểm deploy. Script
-sẽ đưa giá trị này vào biến môi trường `GESTURE_API_KEY` của Azure Container
-App. Gateway phải dùng lại đúng chuỗi đó ở tham số `-ApiKey` hoặc biến
-`AZURE_GESTURE_API_KEY`.
-
-Ví dụ demo có thể đặt:
-
-```bash
-export GESTURE_API_KEY="azure_iot_ck_2026_demo"
-```
-
-Không gõ nguyên chuỗi placeholder `"<AZURE_API_KEY>"` hoặc `"<API_KEY>"` khi
-chạy thật. Nếu dùng placeholder, Azure sẽ trả `401` và gateway sẽ hiển thị
-`no_gesture (0.00)` vì request cloud bị từ chối.
-
-Script mặc định:
-
-- Resource group: `rg-iot-ck-gesture`
-- Region ban đầu: `southeastasia`; nếu Azure for Students policy chặn region
-  này, script tự thử các region fallback cho Container Apps.
-- Container Apps environment: `iot-ck-env`
-- App name: `iot-ck-gesture-api`
-- Image: `ghcr.io/anroiy123/iot-ck-gesture-api:azure`
-- CPU/RAM: `1.0 CPU`, `2.0Gi`
-- Scale: `min-replicas=0`, `max-replicas=1`
-- Ingress: external HTTP, target port `7860`
-- Logs destination: `none` để không tạo Log Analytics workspace. Gateway vẫn
-  ghi log latency CSV ở laptop.
-
-Sau khi script in URL Azure, kiểm tra:
-
-```powershell
-Invoke-RestMethod https://<AZURE_APP_URL>/health
-Invoke-RestMethod https://<AZURE_APP_URL>/v1/model
-```
-
-Chạy gateway với Azure:
-
-```powershell
-$env:AZURE_GESTURE_API_KEY="AZURE_API_KEY_DA_DAT_LUC_DEPLOY"
-.\scripts\run_gateway_azure.ps1 `
-  -AzureUrl https://<AZURE_APP_URL> `
-  -DryRun
-```
-
-Chạy thật với ESP32:
-
-```powershell
-$env:AZURE_GESTURE_API_KEY="AZURE_API_KEY_DA_DAT_LUC_DEPLOY"
-$env:ESP32_COMMAND_TOKEN="TOKEN_DIEU_KHIEN_DA_NAP_VAO_ESP32"
-.\scripts\run_gateway_azure.ps1 `
-  -AzureUrl https://<AZURE_APP_URL> `
-  -Esp32Host <ESP32_IP>
-```
-
-Khi test xong, nếu không cần giữ Azure chạy, xóa resource group để tránh chi phí:
-
-```bash
-az group delete --name rg-iot-ck-gesture --yes --no-wait
-```
+Kết quả CNN hiện tại chưa đạt mục tiêu Macro F1 0,90.
 
 ## Chạy test
 
@@ -621,77 +635,97 @@ az group delete --name rg-iot-ck-gesture --yes --no-wait
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Kết quả gần nhất:
+Kết quả xác minh ngày 14/06/2026:
 
 ```text
 28 passed
 ```
 
-Test bao phủ protocol, gesture mapping, safety filter, cloud API, HTTP
-connection reuse, data split, data collection và CNN pipeline.
-
 ## Troubleshooting
 
-### ESP32 không phản hồi qua Wi-Fi
+### UI luôn hiện `no_gesture (0.00)`
 
-1. Kiểm tra ESP32 và laptop cùng mạng Wi-Fi.
-2. Xem IP mới trong Serial Monitor.
-3. Chạy `Invoke-RestMethod http://<ESP32_IP>/health`.
-4. Cập nhật `-Esp32Host` khi chạy gateway.
-5. Kiểm tra firewall/router có chặn client-to-client hay không.
+Đây thường là lỗi request cloud, không phải model dự đoán `no_gesture`.
 
-### Gateway nhận tay nhưng không gửi command
+1. Kiểm tra có đang truyền nguyên placeholder `"<API_KEY>"` hay không.
+2. Kiểm tra `.env` chứa đúng `AZURE_GESTURE_API_KEY`.
+3. Kiểm tra endpoint `/health`.
+4. Xem CSV: nếu `cloud_rtt_ms=0` và `inference_ms=0`, gateway chưa nhận được
+   response hợp lệ từ cloud.
+5. Nếu key sai, Azure trả HTTP `401`.
 
-- Confidence có thể thấp hơn 0,80.
-- Cử chỉ chưa lặp đủ 3 lần; `stop` cần 2 lần.
-- Xem cột `gesture`, `confidence`, `command` trong CSV.
-- Kiểm tra command token trong gateway có khớp firmware.
+### UI hiện `no_gesture` nhưng confidence lớn hơn `0.00`
 
-### Hugging Face latency cao
+Cloud đã chạy model và model thật sự chọn lớp `no_gesture`. Cần:
 
-- Gọi `/health` trước để đánh thức Space.
-- Dùng mạng ổn định.
-- Không đóng gateway liên tục vì HTTP session cần warm-up.
-- Dùng local mode cho phần demo điều khiển xe.
-- Giữ cloud mode để đo và báo cáo latency thực tế.
+- Đưa tay gần camera hơn và đủ sáng.
+- Giữ cử chỉ giống quy ước khi thu dữ liệu.
+- Kiểm tra ảnh crop/dataset và chất lượng model.
 
-### PlatformIO không mở PIO Home
+### Có gesture nhưng không có command
 
-PIO Home không bắt buộc để build/upload:
+- Confidence phải từ `0.80`.
+- Cử chỉ thường phải lặp 3 lần; `stop` lặp 2 lần.
+- Kiểm tra cột `command` trong CSV.
+- Đảm bảo không chạy với `-DryRun`.
+
+### ESP32 không phản hồi
+
+1. Kiểm tra laptop và ESP32 cùng Wi-Fi.
+2. Lấy lại IP từ Serial Monitor vì DHCP có thể đổi IP.
+3. Gọi `http://<ESP32_IP>/health`.
+4. Kiểm tra `ESP32_COMMAND_TOKEN` trùng `COMMAND_TOKEN`.
+5. Kiểm tra firewall/router có chặn thiết bị trong cùng mạng.
+
+### Azure request đầu chậm
+
+- Đặt `min-replicas=1` trước demo.
+- Gọi `/health` và gửi vài request warm-up trước khi đo.
+- Báo cáo cold start riêng.
+
+### PlatformIO Home không mở
+
+Không cần PIO Home. Dùng trực tiếp:
 
 ```powershell
 .\.venv\Scripts\pio.exe run -d firmware
 .\.venv\Scripts\pio.exe run -d firmware -t upload
 ```
 
-### ESP32 boot không ổn định
+## Cấu trúc repository
 
-GPIO12 là strapping pin. Chuyển IN1 sang GPIO33 cả trong mạch và
-`firmware/include/config.h`.
+```text
+firmware/                 Firmware PlatformIO chính cho ESP32
+arduino/                  Bản Arduino IDE dùng khi cần
+gateway/                  Camera, MediaPipe, cloud client, safety, WebSocket
+cloud/                    FastAPI và inference
+common/                   Protocol, label và gesture mapping
+ml/                       Thu dữ liệu, train, benchmark và model policy
+deploy/azure/              Dockerfile cho Azure
+deploy/huggingface/        Cấu hình provider phụ
+data/                     Metadata và dữ liệu thu
+models/                   Model đã huấn luyện
+reports/                  Metrics và latency log
+scripts/                  Script setup, chạy và deploy
+tests/                    Pytest
+```
 
-## Hạn chế và công việc tiếp theo
+## Hạn chế và việc còn lại
 
-- Accuracy 83,33% và Macro F1 83,37% chưa đạt mục tiêu 90%.
-- `one`, `two`, `like` và `dislike` còn nhầm lẫn đáng kể.
-- Dữ liệu `s05`, `peace` và `no_gesture` chưa cân bằng với các lớp khác.
-- Cần huấn luyện/đánh giá CNN-LSTM trên cùng subject split.
-- Cần báo cáo accuracy theo nền đơn giản/phức tạp và false activation.
-- Cần đo local/cloud latency theo nhiều phiên và báo cáo cold start riêng.
-- Free Hugging Face Space không bảo đảm p95 dưới 500 ms.
-
-Tiêu chí lựa chọn model cuối:
-
-- Chọn CNN nếu accuracy thấp hơn CNN-LSTM không quá 2 điểm phần trăm và latency
-  nhanh hơn ít nhất 20%.
-- Chọn CNN-LSTM nếu cải thiện tối thiểu 2 điểm phần trăm và p95 end-to-end vẫn
-  đáp ứng yêu cầu demo.
+- CNN hiện đạt Macro F1 83,37%, chưa đạt mục tiêu 90%.
+- `one`, `two`, `like` và `dislike` vẫn còn nhầm lẫn.
+- Dataset chưa cân bằng hoàn toàn giữa các lớp.
+- CNN-LSTM chưa được huấn luyện và đánh giá đầy đủ.
+- Chưa có báo cáo hoàn chỉnh theo nền đơn giản/phức tạp và false activation.
+- `servo_cooldown_ms=250` đã có trong policy nhưng chưa được áp dụng trong
+  vòng lặp gửi lệnh gateway.
+- Cần đo thêm latency nhiều phiên và tách cold start/warm request.
 
 ## Tài liệu liên quan
 
-- Yêu cầu đề tài: [requirement.txt](requirement.txt)
-- Quy ước cử chỉ: [label.md](label.md)
-- Công việc tiếp theo: [NEXT_STEPS.md](NEXT_STEPS.md)
-- TensorFlow: <https://www.tensorflow.org/install/pip>
-- MediaPipe: <https://developers.google.com/mediapipe/solutions/vision/gesture_recognizer/python>
-- Hugging Face Docker Spaces: <https://huggingface.co/docs/hub/en/spaces-sdks-docker>
-- HaGRID: <https://github.com/hukenovs/hagrid>
+- [Yêu cầu đề tài](requirement.txt)
+- [Quy ước cử chỉ](label.md)
+- [Công việc tiếp theo](NEXT_STEPS.md)
+- [Dữ liệu](data/README.md)
+- [Model](models/README.md)
+- [Báo cáo](reports/README.md)
