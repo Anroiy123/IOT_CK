@@ -643,16 +643,19 @@ Kết quả xác minh ngày 14/06/2026:
 
 ## Troubleshooting
 
-### UI luôn hiện `no_gesture (0.00)`
+### UI hiện `cloud_error (0.00)`
 
-Đây thường là lỗi request cloud, không phải model dự đoán `no_gesture`.
+Gateway không nhận được response hợp lệ từ cloud.
 
 1. Kiểm tra có đang truyền nguyên placeholder `"<API_KEY>"` hay không.
 2. Kiểm tra `.env` chứa đúng `AZURE_GESTURE_API_KEY`.
 3. Kiểm tra endpoint `/health`.
-4. Xem CSV: nếu `cloud_rtt_ms=0` và `inference_ms=0`, gateway chưa nhận được
-   response hợp lệ từ cloud.
+4. Xem thông báo lỗi trong terminal và các cột `cloud_rtt_ms`, `inference_ms`
+   trong CSV.
 5. Nếu key sai, Azure trả HTTP `401`.
+
+Các phiên gateway cũ có thể ghi lỗi cloud thành `no_gesture (0.00)`. Phiên bản
+hiện tại dùng `cloud_error` để phân biệt với kết quả thật của model.
 
 ### UI hiện `no_gesture` nhưng confidence lớn hơn `0.00`
 

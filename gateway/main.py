@@ -67,10 +67,11 @@ def run_gateway(args: argparse.Namespace) -> None:
             else:
                 try:
                     cloud_pred = cloud.predict([encoded.tobytes()], session_id=session_id, request_id=request_id)
-                except Exception:
+                except Exception as exc:
+                    print(f"Cloud prediction failed: {exc}")
                     seq = _send_stop_safely(transport, mapper, seq, session_id, request_id, mode, args.esp32_token)
                     cloud_pred = CloudPrediction(
-                        gesture="no_gesture",
+                        gesture="cloud_error",
                         confidence=0.0,
                         inference_ms=0.0,
                         model_version="unavailable",
