@@ -4,6 +4,7 @@ param(
   [string]$Esp32Host = "192.168.2.126",
   [string]$Esp32Token = "CHANGE_ME",
   [int]$Camera = 0,
+  [int]$Speed = 180,
   [string]$Log = "reports/gateway_latency.csv",
   [int]$MaxFrames = 0,
   [switch]$Headless,
@@ -19,6 +20,7 @@ $gatewayArgs = @(
   "--esp32-ws", $wsUrl,
   "--esp32-token", $Esp32Token,
   "--camera", $Camera,
+  "--speed", $Speed,
   "--log", $Log
 )
 if ($MaxFrames -gt 0) { $gatewayArgs += @("--max-frames", $MaxFrames) }

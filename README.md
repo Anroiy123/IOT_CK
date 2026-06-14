@@ -154,7 +154,8 @@ Chạy gateway:
 ```powershell
 .\scripts\run_gateway_azure.ps1 `
   -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
-  -Esp32Host "<ESP32_IP>"
+  -Esp32Host "<ESP32_IP>" `
+  -Speed 255
 ```
 
 Gateway kết nối tới:
@@ -481,7 +482,8 @@ Chạy thật:
   -CloudUrl "http://127.0.0.1:8001" `
   -ApiKey "local-dev" `
   -Esp32Host "<ESP32_IP>" `
-  -Esp32Token $env:ESP32_COMMAND_TOKEN
+  -Esp32Token $env:ESP32_COMMAND_TOKEN `
+  -Speed 255
 ```
 
 ## Hugging Face Spaces
@@ -671,6 +673,13 @@ Cloud đã chạy model và model thật sự chọn lớp `no_gesture`. Cần:
 - Cử chỉ thường phải lặp 3 lần; `stop` lặp 2 lần.
 - Kiểm tra cột `command` trong CSV.
 - Đảm bảo không chạy với `-DryRun`.
+
+### Có `command: forward` nhưng xe không chạy
+
+- Gateway mặc định dùng `-Speed 180`; một số xe cần PWM cao hơn để thắng ma sát.
+- Chạy demo với `-Speed 255`.
+- Nếu `esp32_ack_ms` trong CSV khác 0 nhưng bánh vẫn không quay, kiểm tra nguồn
+  motor, GND chung, dây `ENA/ENB` và dây `IN1..IN4`.
 
 ### ESP32 không phản hồi
 
