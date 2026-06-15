@@ -34,6 +34,23 @@ reports/*.csv
 reports/*.json
 reports/*.log
 reports/*.png
+reports/*_QA.pdf
+reports/*_QA.json
+reports/*_revised.docx
+reports/*_revised_QA.pdf
+reports/backup_*.docx
+reports/fixed_report_render/
+reports/fixed_report_render_final/
+reports/gesture_like_qa/
+reports/md_media/
+reports/render_revised/
+reports/render_revised_word/
+reports/report_render/
+reports/review_other_ai/
+reports/vehicle_image_qa/
+
+# Local report exports outside reports/
+/bao_cao_gesture_recognition_iot_ck.docx
 
 # Local demo media and archives
 /lab Robot/

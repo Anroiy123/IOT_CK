@@ -1,0 +1,71 @@
+{
+  "Azure": {
+    "rows": 11179,
+    "cloud_rtt_ms": {
+      "n": 6622,
+      "median": 158.08,
+      "p95": 171.58
+    },
+    "inference_ms": {
+      "n": 6622,
+      "median": 64.01,
+      "p95": 74.28
+    },
+    "esp32_ack_ms": {
+      "n": 689,
+      "median": 120.05,
+      "p95": 140.45
+    },
+    "total_ms": {
+      "n": 11179,
+      "median": 170.38,
+      "p95": 282.89
+    }
+  },
+  "Hugging Face": {
+    "rows": 9818,
+    "cloud_rtt_ms": {
+      "n": 1931,
+      "median": 338.18,
+      "p95": 822.99
+    },
+    "inference_ms": {
+      "n": 1931,
+      "median": 76.66,
+      "p95": 105.25
+    },
+    "esp32_ack_ms": {
+      "n": 328,
+      "median": 69.06,
+      "p95": 137.72
+    },
+    "total_ms": {
+      "n": 9818,
+      "median": 18.25,
+      "p95": 396.96
+    }
+  },
+  "Local": {
+    "rows": 2900,
+    "cloud_rtt_ms": {
+      "n": 2900,
+      "median": 4.61,
+      "p95": 22.18
+    },
+    "inference_ms": {
+      "n": 1,
+      "median": 0.07,
+      "p95": 0.07
+    },
+    "esp32_ack_ms": {
+      "n": 0,
+      "median": 0.0,
+      "p95": 0.0
+    },
+    "total_ms": {
+      "n": 2900,
+      "median": 33.94,
+      "p95": 82.41
+    }
+  }
+}

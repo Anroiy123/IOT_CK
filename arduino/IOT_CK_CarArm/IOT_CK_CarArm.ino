@@ -28,6 +28,8 @@ Adafruit_PWMServoDriver servoDriver(0x40);
 const char* JOINT_NAMES[4] = {"base", "lower", "upper", "gripper"};
 const int SERVO_MIN_ANGLES[4] = {0, 20, 20, 15};
 const int SERVO_MAX_ANGLES[4] = {180, 160, 160, 100};
+constexpr int SERVO_MOVE_DELAY_MS = 12;
+constexpr int SERVO_SETTLE_DELAY_MS = 80;
 
 void stopMotors() {
   digitalWrite(PIN_IN1, LOW);
@@ -37,6 +39,10 @@ void stopMotors() {
   ledcWrite(PIN_ENA, 0);
   ledcWrite(PIN_ENB, 0);
   state.speed = 0;
+}
+
+void releaseServo(int index) {
+  servoDriver.setPWM(index, 0, 0);
 }
 
 void setMotorGroup(int inputA, int inputB, bool forward) {
@@ -75,6 +81,19 @@ int pulseForAngle(int angle) {
 
 void writeServo(int index) {
   servoDriver.setPWM(index, 0, pulseForAngle(state.servoAngles[index]));
+}
+
+void moveServoTo(int index, int targetAngle) {
+  targetAngle = constrain(targetAngle, SERVO_MIN_ANGLES[index], SERVO_MAX_ANGLES[index]);
+  const int direction = targetAngle >= state.servoAngles[index] ? 1 : -1;
+
+  while (state.servoAngles[index] != targetAngle) {
+    state.servoAngles[index] += direction;
+    writeServo(index);
+    delay(SERVO_MOVE_DELAY_MS);
+  }
+  delay(SERVO_SETTLE_DELAY_MS);
+  releaseServo(index);
 }
 
 int jointIndex(const String& joint) {
@@ -133,12 +152,12 @@ bool applyCommand(JsonDocument& document, String& error) {
     const int index = jointIndex(document["joint"] | JOINT_NAMES[state.selectedJoint]);
     const int delta = document["delta"] | 0;
     state.selectedJoint = index;
-    state.servoAngles[index] = constrain(
+    const int targetAngle = constrain(
       state.servoAngles[index] + delta,
       SERVO_MIN_ANGLES[index],
       SERVO_MAX_ANGLES[index]
     );
-    writeServo(index);
+    moveServoTo(index, targetAngle);
     return true;
   }
 
@@ -197,6 +216,13 @@ void onWebSocketEvent(uint8_t clientNumber, WStype_t type, uint8_t* payload, siz
 }
 
 void setupPins() {
+  digitalWrite(PIN_IN1, LOW);
+  digitalWrite(PIN_IN2, LOW);
+  digitalWrite(PIN_IN3, LOW);
+  digitalWrite(PIN_IN4, LOW);
+  digitalWrite(PIN_ENA, LOW);
+  digitalWrite(PIN_ENB, LOW);
+
   pinMode(PIN_IN1, OUTPUT);
   pinMode(PIN_IN2, OUTPUT);
   pinMode(PIN_IN3, OUTPUT);
@@ -268,30 +294,28 @@ void handleSerialTest() {
       Serial.printf("Selected joint: %s\n", JOINT_NAMES[state.selectedJoint]);
       break;
     case '+':
-      state.servoAngles[state.selectedJoint] = constrain(
+      moveServoTo(state.selectedJoint, constrain(
         state.servoAngles[state.selectedJoint] + 5,
         SERVO_MIN_ANGLES[state.selectedJoint],
         SERVO_MAX_ANGLES[state.selectedJoint]
-      );
-      writeServo(state.selectedJoint);
+      ));
       break;
     case '-':
-      state.servoAngles[state.selectedJoint] = constrain(
+      moveServoTo(state.selectedJoint, constrain(
         state.servoAngles[state.selectedJoint] - 5,
         SERVO_MIN_ANGLES[state.selectedJoint],
         SERVO_MAX_ANGLES[state.selectedJoint]
-      );
-      writeServo(state.selectedJoint);
+      ));
       break;
   }
 }
 
 void setup() {
   Serial.begin(115200);
+  setupPins();
   delay(500);
   Serial.println("\nIOT_CK CarArm starting");
 
-  setupPins();
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   servoDriver.begin();
   servoDriver.setPWMFreq(50);

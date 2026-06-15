@@ -34,7 +34,7 @@ class ModelDecision:
 def required_experiments() -> list[dict[str, object]]:
     return [
         {"name": "cnn", "required": True, "role": "baseline"},
-        {"name": "cnn_lstm", "required": False, "role": "advanced_comparison"},
+        {"name": "cnn_lstm", "required": True, "role": "comparison"},
     ]
 
 

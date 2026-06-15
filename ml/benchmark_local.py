@@ -3,27 +3,29 @@ from __future__ import annotations
 import argparse
 import time
 
-import cv2
 import numpy as np
 
-from cloud.inference import LocalPredictor
-
-
 def main() -> None:
+    import tensorflow as tf
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path")
+    parser.add_argument("--model-path", required=True)
+    parser.add_argument("--model-type", choices=("cnn", "cnn_lstm"), default="cnn")
+    parser.add_argument("--image-size", type=int, default=160)
+    parser.add_argument("--frames", type=int, default=8)
     parser.add_argument("--iterations", type=int, default=30)
     args = parser.parse_args()
-    predictor = LocalPredictor(args.model_path, model_version="local-benchmark")
-    image = np.zeros((160, 160, 3), dtype=np.uint8)
-    ok, encoded = cv2.imencode(".jpg", image)
-    if not ok:
-        raise RuntimeError("Could not create benchmark JPEG")
-    jpeg = encoded.tobytes()
+
+    model = tf.keras.models.load_model(args.model_path)
+    if args.model_type == "cnn_lstm":
+        sample = np.zeros((1, args.frames, args.image_size, args.image_size, 3), dtype=np.float32)
+    else:
+        sample = np.zeros((1, args.image_size, args.image_size, 3), dtype=np.float32)
+
     durations = []
     for _ in range(args.iterations):
         start = time.perf_counter()
-        predictor.predict([jpeg])
+        model.predict(sample, batch_size=1, verbose=0)
         durations.append((time.perf_counter() - start) * 1000)
     durations.sort()
     median = durations[len(durations) // 2]

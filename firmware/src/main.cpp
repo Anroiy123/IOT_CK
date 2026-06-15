@@ -27,6 +27,8 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 const char* jointNames[4] = {"base", "lower", "upper", "gripper"};
 const int servoMinAngles[4] = {0, 20, 20, 15};
 const int servoMaxAngles[4] = {180, 160, 160, 100};
+constexpr int SERVO_MOVE_DELAY_MS = 12;
+constexpr int SERVO_SETTLE_DELAY_MS = 80;
 
 void stopMotors() {
   digitalWrite(PIN_IN1, LOW);
@@ -36,6 +38,10 @@ void stopMotors() {
   ledcWrite(PWM_LEFT_CHANNEL, 0);
   ledcWrite(PWM_RIGHT_CHANNEL, 0);
   state.speed = 0;
+}
+
+void releaseServo(int index) {
+  pwm.setPWM(index, 0, 0);
 }
 
 void setMotorGroup(int inA, int inB, bool forward) {
@@ -72,6 +78,19 @@ int pulseForAngle(int angle) {
 
 void writeServo(int index) {
   pwm.setPWM(index, 0, pulseForAngle(state.servoAngles[index]));
+}
+
+void moveServoTo(int index, int targetAngle) {
+  targetAngle = constrain(targetAngle, servoMinAngles[index], servoMaxAngles[index]);
+  const int direction = targetAngle >= state.servoAngles[index] ? 1 : -1;
+
+  while (state.servoAngles[index] != targetAngle) {
+    state.servoAngles[index] += direction;
+    writeServo(index);
+    delay(SERVO_MOVE_DELAY_MS);
+  }
+  delay(SERVO_SETTLE_DELAY_MS);
+  releaseServo(index);
 }
 
 int jointIndex(const char* joint) {
@@ -122,12 +141,12 @@ bool applyCommand(JsonDocument& doc, String& error) {
   if (strcmp(action, "arm_delta") == 0) {
     int idx = jointIndex(doc["joint"] | jointNames[state.selectedJoint]);
     state.selectedJoint = idx;
-    state.servoAngles[idx] = constrain(
+    const int targetAngle = constrain(
       state.servoAngles[idx] + (doc["delta"] | 0),
       servoMinAngles[idx],
       servoMaxAngles[idx]
     );
-    writeServo(idx);
+    moveServoTo(idx, targetAngle);
     return true;
   }
   error = "unknown_action";
@@ -170,6 +189,13 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
 }
 
 void setupPins() {
+  digitalWrite(PIN_IN1, LOW);
+  digitalWrite(PIN_IN2, LOW);
+  digitalWrite(PIN_IN3, LOW);
+  digitalWrite(PIN_IN4, LOW);
+  digitalWrite(PIN_ENA, LOW);
+  digitalWrite(PIN_ENB, LOW);
+
   pinMode(PIN_IN1, OUTPUT);
   pinMode(PIN_IN2, OUTPUT);
   pinMode(PIN_IN3, OUTPUT);
@@ -199,7 +225,6 @@ void setup() {
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   pwm.begin();
   pwm.setPWMFreq(50);
-  for (int i = 0; i < 4; i++) writeServo(i);
   setupWiFi();
   server.on("/health", HTTP_GET, []() { server.send(200, "application/json", "{\"status\":\"ok\"}"); });
   server.on("/state", HTTP_GET, []() { server.send(200, "application/json", stateJson()); });

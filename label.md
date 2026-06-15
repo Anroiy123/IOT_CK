@@ -4,21 +4,12 @@ Dùng đúng 8 label này. Nên giữ cử chỉ **dễ phân biệt bằng mắ
 | ------------ | ------------------------------------------------------------ | ---------------------------- |
 | `stop`       | Bàn tay mở, lòng bàn tay hướng vào camera, 5 ngón xòe rõ     | Dừng khẩn cấp                |
 | `peace`      | Giơ 2 ngón chữ V                                             | Chuyển sang chế độ xe        |
-| `rock`       | Ký hiệu rock: ngón trỏ + ngón út giơ lên, các ngón khác gập  | Chuyển sang chế độ tay máy   |
+| `rock`       | Ký hiệu rock: nắm đấm                                        | Chuyển sang chế độ tay máy   |
 | `like`       | Ngón cái hướng lên                                           | Xe tiến / tăng góc servo     |
 | `dislike`    | Ngón cái hướng xuống                                         | Xe lùi / giảm góc servo      |
-| `one`        | Giơ 1 ngón trỏ                                               | Xe rẽ trái / chọn khớp trước |
-| `two`        | Giơ 2 ngón trỏ + giữa thẳng đứng, không tạo chữ V quá rộng   | Xe rẽ phải / chọn khớp tiếp  |
+| `one`        | Giơ 1 ngón trỏ sang ngang                                    | Xe rẽ trái / chọn khớp trước |
+| `two`        | Giơ 2 ngón trỏ sang ngang                                    | Xe rẽ phải / chọn khớp tiếp  |
 | `no_gesture` | Không đưa tay vào khung hình, hoặc tay đặt ngoài vùng camera | Không phát lệnh              |
-
-**Khuyến nghị quan trọng**
-
-`peace` và `two` rất dễ bị giống nhau. Để phân biệt:
-
-- `peace`: làm chữ V rộng, lòng bàn tay hơi nghiêng.
-- `two`: giơ 2 ngón sát nhau, thẳng đứng như số 2.
-
-Nếu thấy khó phân biệt khi train, có thể đổi `two` sang cử chỉ khác dễ hơn, ví dụ “nắm tay” hoặc “chỉ sang phải”. Nhưng nếu muốn tương thích HaGRID phổ biến thì giữ `two`.
 
 **Cách quay dữ liệu cho mỗi label**
 

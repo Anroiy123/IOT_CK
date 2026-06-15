@@ -35,7 +35,7 @@ Cập nhật ngày 14/06/2026:
 - CNN baseline MobileNetV3Small đã được huấn luyện bằng dữ liệu của 5 người.
 - Model đã được đóng gói trong image trên GitHub Container Registry (GHCR).
 - API đang chạy trên Azure Container Apps tại Japan East.
-- Bộ test hiện tại: `28 passed`.
+- Bộ test hiện tại: `38 passed`.
 
 Azure API hiện tại:
 
@@ -54,11 +54,11 @@ Invoke-RestMethod "$AzureUrl/v1/model"
 Kết quả mong đợi:
 
 ```json
-{"status":"ok"}
+{ "status": "ok" }
 ```
 
 ```json
-{"model_version":"cnn-s05-partial-v1","model_type":"cnn"}
+{ "model_version": "cnn-s05-partial-v1", "model_type": "cnn" }
 ```
 
 ## Chạy nhanh
@@ -105,10 +105,10 @@ placeholder trong tài liệu và sẽ bị Azure từ chối.
 
 Hai khóa có mục đích khác nhau:
 
-| Biến | Nơi sử dụng | Mục đích |
-|---|---|---|
-| `AZURE_GESTURE_API_KEY` | Gateway và Azure API | Xác thực request `/v1/predict` |
-| `ESP32_COMMAND_TOKEN` | Gateway và firmware ESP32 | Xác thực lệnh WebSocket |
+| Biến                    | Nơi sử dụng               | Mục đích                       |
+| ----------------------- | ------------------------- | ------------------------------ |
+| `AZURE_GESTURE_API_KEY` | Gateway và Azure API      | Xác thực request `/v1/predict` |
+| `ESP32_COMMAND_TOKEN`   | Gateway và firmware ESP32 | Xác thực lệnh WebSocket        |
 
 Các khóa này do nhóm tự đặt, không lấy từ Azure Portal hoặc Hugging Face.
 `.env` đã được Git ignore; không commit secret lên GitHub.
@@ -175,6 +175,18 @@ nhanh hơn, còn lệnh servo vẫn giữ ngưỡng chính `0.80`:
   -ServoCooldownMs 350
 ```
 
+```powershell
+.\scripts\run_gateway_azure.ps1 `
+  -AzureUrl "https://iot-ck-gesture-api.graysky-cdd83781.japaneast.azurecontainerapps.io" `
+  -Esp32Host "10.183.45.74" `
+  -Speed 160 `
+  -ModeMinConfidence 0.60 `
+  -ModeRequired 2 `
+  -MinConfidence 0.80 `
+  -NormalRequired 3 `
+  -ServoCooldownMs 350
+```
+
 Luồng thao tác tay máy: đưa `rock` để vào `arm`, dùng `one/two` để chọn khớp,
 dùng `like/dislike` để tăng/giảm góc, và dùng `peace` để quay lại `car`.
 
@@ -186,16 +198,16 @@ ws://<ESP32_IP>:81/
 
 ## Cử chỉ và chức năng
 
-| Label | Cách làm tay | Chế độ xe | Chế độ tay máy |
-|---|---|---|---|
-| `stop` | Xòe bàn tay, năm ngón rõ | Dừng xe | Dừng motor |
-| `peace` | Chữ V mở rộng | Chuyển sang chế độ xe | Chuyển sang chế độ xe |
-| `rock` | Giơ ngón trỏ và ngón út | Chuyển sang chế độ tay máy | Giữ chế độ tay máy |
-| `like` | Ngón cái hướng lên | Tiến | Tăng góc khớp 5 độ |
-| `dislike` | Ngón cái hướng xuống | Lùi | Giảm góc khớp 5 độ |
-| `one` | Một ngón trỏ | Rẽ trái | Chọn khớp trước |
-| `two` | Hai ngón giữ sát nhau | Rẽ phải | Chọn khớp tiếp |
-| `no_gesture` | Không có cử chỉ hợp lệ | Không phát lệnh | Không phát lệnh |
+| Label        | Cách làm tay             | Chế độ xe                  | Chế độ tay máy        |
+| ------------ | ------------------------ | -------------------------- | --------------------- |
+| `stop`       | Xòe bàn tay, năm ngón rõ | Dừng xe                    | Dừng motor            |
+| `peace`      | Chữ V mở rộng            | Chuyển sang chế độ xe      | Chuyển sang chế độ xe |
+| `rock`       | Giơ ngón trỏ và ngón út  | Chuyển sang chế độ tay máy | Giữ chế độ tay máy    |
+| `like`       | Ngón cái hướng lên       | Tiến                       | Tăng góc khớp 5 độ    |
+| `dislike`    | Ngón cái hướng xuống     | Lùi                        | Giảm góc khớp 5 độ    |
+| `one`        | Một ngón trỏ             | Rẽ trái                    | Chọn khớp trước       |
+| `two`        | Hai ngón giữ sát nhau    | Rẽ phải                    | Chọn khớp tiếp        |
+| `no_gesture` | Không có cử chỉ hợp lệ   | Không phát lệnh            | Không phát lệnh       |
 
 Thứ tự khớp:
 
@@ -243,16 +255,16 @@ Không hạ confidence hoặc số lần xác nhận chỉ để xe phản hồi
 
 ## Phần cứng và pinout
 
-| Chức năng | ESP32 GPIO |
-|---|---:|
-| L298N ENA | 13 |
-| L298N IN1 | 12 |
-| L298N IN2 | 14 |
-| L298N IN3 | 27 |
-| L298N IN4 | 26 |
-| L298N ENB | 25 |
-| PCA9685 SDA | 21 |
-| PCA9685 SCL | 22 |
+| Chức năng   | ESP32 GPIO |
+| ----------- | ---------: |
+| L298N ENA   |         13 |
+| L298N IN1   |         12 |
+| L298N IN2   |         14 |
+| L298N IN3   |         27 |
+| L298N IN4   |         26 |
+| L298N ENB   |         25 |
+| PCA9685 SDA |         21 |
+| PCA9685 SCL |         22 |
 
 Thông số firmware:
 
@@ -350,7 +362,7 @@ Nên tạo file log riêng cho mỗi phiên đo:
 Trả trạng thái hoạt động:
 
 ```json
-{"status":"ok"}
+{ "status": "ok" }
 ```
 
 ### `GET /v1/model`
@@ -358,7 +370,7 @@ Trả trạng thái hoạt động:
 Trả model đang được load:
 
 ```json
-{"model_version":"cnn-s05-partial-v1","model_type":"cnn"}
+{ "model_version": "cnn-s05-partial-v1", "model_type": "cnn" }
 ```
 
 ### `POST /v1/predict`
@@ -410,17 +422,17 @@ GitHub Actions
 
 Tài nguyên hiện tại:
 
-| Thành phần | Giá trị |
-|---|---|
-| Subscription | Azure for Students |
-| Resource group | `rg-iot-ck-gesture` |
-| Environment | `iot-ck-env` |
-| Container App | `iot-ck-gesture-api` |
-| Region | Japan East |
-| Image | `ghcr.io/anroiy123/iot-ck-gesture-api:azure` |
-| CPU/RAM | 1 CPU / 2 GiB |
-| Min replicas hiện tại | 1 |
-| Max replicas | 1 |
+| Thành phần            | Giá trị                                      |
+| --------------------- | -------------------------------------------- |
+| Subscription          | Azure for Students                           |
+| Resource group        | `rg-iot-ck-gesture`                          |
+| Environment           | `iot-ck-env`                                 |
+| Container App         | `iot-ck-gesture-api`                         |
+| Region                | Japan East                                   |
+| Image                 | `ghcr.io/anroiy123/iot-ck-gesture-api:azure` |
+| CPU/RAM               | 1 CPU / 2 GiB                                |
+| Min replicas hiện tại | 1                                            |
+| Max replicas          | 1                                            |
 
 Model `models/gesture-cnn-baseline-s05-partial.keras` nằm trong GitHub
 repository và được copy trực tiếp vào image. Azure không tải model từ Hugging
@@ -516,16 +528,16 @@ phải backend chính của bản demo hiện tại.
 
 ### Dataset hiện tại
 
-| Thành phần | Giá trị |
-|---|---:|
-| Số người | 5 (`s01` đến `s05`) |
-| Số lớp | 8 |
-| Số clip | 570 |
-| Số frame | 8.550 |
-| Train | 5.400 frame |
-| Validation | 1.350 frame |
-| Test | 1.800 frame |
-| Cách chia | Theo người |
+| Thành phần |             Giá trị |
+| ---------- | ------------------: |
+| Số người   | 5 (`s01` đến `s05`) |
+| Số lớp     |                   8 |
+| Số clip    |                 570 |
+| Số frame   |               8.550 |
+| Train      |         5.400 frame |
+| Validation |         1.350 frame |
+| Test       |         1.800 frame |
+| Cách chia  |          Theo người |
 
 `s05` có 90 clip; `s01`-`s04` có 120 clip/người. `peace` và `no_gesture`
 có 900 frame/lớp; sáu lớp còn lại có 1.125 frame/lớp.
@@ -541,13 +553,13 @@ Model đang dùng:
 models/gesture-cnn-baseline-s05-partial.keras
 ```
 
-| Chỉ số test | Giá trị |
-|---|---:|
-| Accuracy | 83,33% |
-| Macro F1 | 83,37% |
-| Kích thước ảnh | 160 x 160 |
-| Backbone | MobileNetV3Small |
-| Pretrained | ImageNet |
+| Chỉ số test    |          Giá trị |
+| -------------- | ---------------: |
+| Accuracy       |           83,33% |
+| Macro F1       |           83,37% |
+| Kích thước ảnh |        160 x 160 |
+| Backbone       | MobileNetV3Small |
+| Pretrained     |         ImageNet |
 
 Metrics đầy đủ:
 
@@ -555,9 +567,39 @@ Metrics đầy đủ:
 reports/cnn_baseline_s05_partial_metrics.json
 ```
 
-CNN-LSTM là mô hình so sánh nâng cao. Repo hiện có kiến trúc
-`TimeDistributed(MobileNetV3Small) -> LSTM(64) -> Softmax`, nhưng chưa có kết
-quả huấn luyện/đánh giá hoàn chỉnh để thay CNN baseline.
+### CNN-LSTM để so sánh
+
+Model so sánh hiện tại:
+
+```text
+models/gesture-cnn-lstm-comparison.keras
+```
+
+Kiến trúc:
+
+```text
+TimeDistributed(MobileNetV3Small) -> LSTM(64) -> Dropout -> Softmax
+```
+
+Kết quả clip-level hiện tại trên cùng subject split:
+
+| Chỉ số | CNN | CNN-LSTM |
+|---|---:|---:|
+| Accuracy | 86,67% | 13,33% |
+| Macro F1 | 86,70% | 4,29% |
+| Local inference median | 57,09 ms | 57,36 ms |
+| Local inference p95 | 71,93 ms | 62,11 ms |
+| False activation `no_gesture` | 0,00% | 100,00% |
+
+Kết luận hiện tại: giữ `CNN` làm model chính; `CNN-LSTM` chỉ đóng vai trò đối
+chứng học thuật và chưa đủ tốt để thay baseline.
+
+Artifact so sánh:
+
+```text
+reports/cnn_lstm_metrics.json
+reports/cnn_comparison_summary.json
+```
 
 ### Huấn luyện CNN
 
@@ -575,6 +617,25 @@ Benchmark inference local:
 .\.venv\Scripts\python.exe -m ml.benchmark_local `
   --model-path "models/gesture-cnn-baseline-s05-partial.keras" `
   --iterations 30
+```
+
+### Huấn luyện CNN-LSTM
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.train_cnn_lstm `
+  --epochs 6 `
+  --batch-size 8 `
+  --output-model "models/gesture-cnn-lstm-comparison.keras" `
+  --metrics-out "reports/cnn_lstm_metrics.json"
+```
+
+Sinh summary so sánh:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.evaluate_models `
+  --cnn-model "models/gesture-cnn-baseline-s05-partial.keras" `
+  --cnn-lstm-model "models/gesture-cnn-lstm-comparison.keras" `
+  --output "reports/cnn_comparison_summary.json"
 ```
 
 ## Thu dữ liệu
@@ -615,10 +676,10 @@ nhau và gây data leakage.
 Từ các dòng hợp lệ có `cloud_rtt_ms > 0` trong
 `reports/gateway_azure_latency.csv`:
 
-| Thành phần | Median | p95 |
-|---|---:|---:|
-| Cloud RTT | 155,77 ms | 172,89 ms |
-| Inference | 62,36 ms | 72,03 ms |
+| Thành phần   |    Median |       p95 |
+| ------------ | --------: | --------: |
+| Cloud RTT    | 155,77 ms | 172,89 ms |
+| Inference    |  62,36 ms |  72,03 ms |
 | Tổng gateway | 172,32 ms | 194,58 ms |
 
 Frame đầu sau khi container/model khởi động có thể chậm hơn đáng kể. Báo cáo
@@ -657,10 +718,10 @@ Kết quả CNN hiện tại chưa đạt mục tiêu Macro F1 0,90.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Kết quả xác minh ngày 14/06/2026:
+Kết quả xác minh ngày 15/06/2026:
 
 ```text
-28 passed
+38 passed
 ```
 
 ## Troubleshooting
@@ -752,8 +813,11 @@ tests/                    Pytest
 - CNN hiện đạt Macro F1 83,37%, chưa đạt mục tiêu 90%.
 - `one`, `two`, `like` và `dislike` vẫn còn nhầm lẫn.
 - Dataset chưa cân bằng hoàn toàn giữa các lớp.
-- CNN-LSTM chưa được huấn luyện và đánh giá đầy đủ.
-- Chưa có báo cáo hoàn chỉnh theo nền đơn giản/phức tạp và false activation.
+- CNN-LSTM đã được train tối thiểu để so sánh nhưng cho kết quả rất thấp; chưa
+  phải phương án khả thi để deploy.
+- Robustness theo `background` và false activation của `no_gesture` đã được
+  tổng hợp offline từ toàn bộ clip, nhưng chưa thay thế cho các phép đo live
+  nhiều phiên với phần cứng.
 - Servo command đã có cooldown; nếu tay máy còn giật hoặc nhầm khớp, cần đo
   thêm log theo từng khớp và cải thiện dataset cho `one/two/like/dislike`.
 - Cần đo thêm latency nhiều phiên và tách cold start/warm request.

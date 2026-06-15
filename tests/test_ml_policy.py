@@ -13,13 +13,13 @@ def test_acceptance_criteria_have_minimum_and_target_levels():
     assert DEFAULT_ACCEPTANCE_CRITERIA["target"]["median_latency_ms"] == 300
 
 
-def test_cnn_is_mandatory_baseline_and_lstm_is_advanced_comparison():
+def test_cnn_and_lstm_are_required_for_final_comparison():
     experiments = required_experiments()
 
     assert experiments[0]["name"] == "cnn"
     assert experiments[0]["required"] is True
     assert experiments[1]["name"] == "cnn_lstm"
-    assert experiments[1]["required"] is False
+    assert experiments[1]["required"] is True
 
 
 def test_choose_cnn_when_accuracy_close_and_latency_is_much_better():

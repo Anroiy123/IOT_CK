@@ -13,7 +13,7 @@ import cv2
 
 from common.protocol import Action, Command, GestureMapper, Mode
 from gateway.cloud_client import CloudGestureClient, CloudPrediction
-from gateway.preprocess import MediaPipeCropper
+from gateway.preprocess import MediaPipeCropper, disambiguate_one_two
 from gateway.safety import GestureStabilizer, LatencyLogRow, SafetyPolicy
 from gateway.transport import DryRunTransport, WebSocketTransport
 
@@ -97,7 +97,8 @@ def run_gateway(args: argparse.Namespace) -> None:
                         request_id=request_id,
                         rtt_ms=0.0,
                     )
-            accepted = stabilizer.accept(cloud_pred.gesture, cloud_pred.confidence)
+            resolved_gesture = disambiguate_one_two(cloud_pred.gesture, crop.extended_fingers)
+            accepted = stabilizer.accept(resolved_gesture, cloud_pred.confidence)
             command_name = ""
             ack_ms = 0.0
             if accepted:
@@ -178,7 +179,7 @@ def run_gateway(args: argparse.Namespace) -> None:
                 LatencyLogRow(
                     session_id=session_id,
                     request_id=request_id,
-                    gesture=cloud_pred.gesture,
+                    gesture=resolved_gesture,
                     confidence=cloud_pred.confidence,
                     mode=mode.value,
                     command=command_name,
@@ -191,7 +192,7 @@ def run_gateway(args: argparse.Namespace) -> None:
                 ).to_csv_row()
             )
             display_frame = cv2.flip(frame, 1)
-            _draw_ui(display_frame, mode.value, cloud_pred.gesture, cloud_pred.confidence, total_ms, command_name)
+            _draw_ui(display_frame, mode.value, joint, resolved_gesture, cloud_pred.confidence, total_ms, command_name)
             if not args.headless:
                 cv2.imshow("IOT_CK Gateway", display_frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -247,13 +248,26 @@ def _send_stop_safely(transport, mapper: GestureMapper, seq: int, session_id: st
     return seq
 
 
-def _draw_ui(frame, mode: str, gesture: str, confidence: float, latency_ms: float, command: str) -> None:
+def _ui_lines(mode: str, joint: str, gesture: str, confidence: float, latency_ms: float, command: str) -> list[str]:
     lines = [
         f"mode: {mode}",
-        f"gesture: {gesture} ({confidence:.2f})",
-        f"latency: {latency_ms:.1f} ms",
-        f"command: {command or '-'}",
     ]
+
+    if mode == Mode.ARM.value:
+        lines.append(f"arm motor: {joint}")
+
+    lines.extend(
+        [
+            f"gesture: {gesture} ({confidence:.2f})",
+            f"latency: {latency_ms:.1f} ms",
+            f"command: {command or '-'}",
+        ]
+    )
+    return lines
+
+
+def _draw_ui(frame, mode: str, joint: str, gesture: str, confidence: float, latency_ms: float, command: str) -> None:
+    lines = _ui_lines(mode, joint, gesture, confidence, latency_ms, command)
     for index, line in enumerate(lines):
         cv2.putText(frame, line, (20, 35 + index * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
